@@ -6,15 +6,18 @@ export type SortKey =
   | 'composite' | 'commute' | 'sqft' | 'condition' | 'outdoor' | 'room' | 'parking'
   | 'value' | 'price'
 
-const SORT_COLUMNS: Record<Exclude<SortKey, 'value' | 'price'>, string> = {
-  composite: 's.composite',
-  commute: 's.commute_score',
-  sqft: 's.sqft_score',
-  condition: 's.condition_score',
-  outdoor: 's.outdoor_score',
-  room: 's.room_count_score',
-  parking: 's.parking_score',
-}
+// A Map (rather than a plain object) so an unrecognized or prototype-polluting
+// key (e.g. '__proto__', 'toString') safely misses instead of resolving to an
+// inherited Object.prototype member.
+const SORT_COLUMNS = new Map<Exclude<SortKey, 'value' | 'price'>, string>([
+  ['composite', 's.composite'],
+  ['commute', 's.commute_score'],
+  ['sqft', 's.sqft_score'],
+  ['condition', 's.condition_score'],
+  ['outdoor', 's.outdoor_score'],
+  ['room', 's.room_count_score'],
+  ['parking', 's.parking_score'],
+])
 
 export interface ListingsFilter {
   search?: string
@@ -50,7 +53,12 @@ export function buildListingsQuery(filter: ListingsFilter): { sql: string; args:
   } else if (filter.sort === 'price') {
     orderBy = 'ORDER BY l.price_numeric ASC NULLS LAST'
   } else {
-    const column = SORT_COLUMNS[filter.sort ?? 'composite']
+    // filter.sort may come from an unvalidated searchParams string (the list
+    // view reads it straight off the URL), so an unrecognized value must fall
+    // back to composite ordering rather than producing `ORDER BY undefined ...`
+    // and crashing at db.execute().
+    const column = SORT_COLUMNS.get(filter.sort as Exclude<SortKey, 'value' | 'price'>)
+      ?? SORT_COLUMNS.get('composite')!
     orderBy = `ORDER BY ${column} DESC NULLS LAST`
   }
 

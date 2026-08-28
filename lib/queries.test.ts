@@ -72,6 +72,18 @@ describe('buildListingsQuery', () => {
     expect(result.rows.map((r) => r.listing_id)).toEqual(['b', 'a'])
   })
 
+  it('falls back to composite ordering for an unrecognized sort key instead of throwing', async () => {
+    const { sql, args } = buildListingsQuery({ sort: 'not-a-real-key' as SortKey })
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id)).toEqual(['a', 'b'])
+  })
+
+  it('falls back to composite ordering for a prototype-polluting sort key instead of throwing', async () => {
+    const { sql, args } = buildListingsQuery({ sort: '__proto__' as SortKey })
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id)).toEqual(['a', 'b'])
+  })
+
   it('filters to only listings that pass cutoffs', async () => {
     const { sql, args } = buildListingsQuery({ onlyPasses: true })
     const result = await db.execute({ sql, args })
