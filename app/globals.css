@@ -244,3 +244,11 @@
   .sticky-cta{ position: sticky; bottom:0; margin-top: 30px; padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 60%, transparent); }
   .sticky-cta a{ display:flex; align-items:center; justify-content:center; gap:8px; background: var(--ink); color: var(--bg); font-weight:800; font-size:14.5px; padding: 15px; border-radius: var(--radius-m); text-decoration:none; }
   .sticky-cta svg{ width:14px; height:14px; }
+
+  .enter-page{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; font-family: var(--font); }
+  .enter-page form{ width:100%; max-width:320px; background: var(--surface); border:1px solid var(--line); border-radius: var(--radius-m); padding:28px 24px; display:flex; flex-direction:column; gap:10px; }
+  .enter-page h1{ margin:0 0 8px; font-size:18px; font-weight:800; color: var(--ink); }
+  .enter-page label{ font-size:12px; font-weight:700; color: var(--ink-2); }
+  .enter-page input{ border:1px solid var(--line); border-radius: var(--radius-m); padding:9px 12px; font-size:14px; font-family: inherit; color: var(--ink); background: var(--surface); }
+  .enter-page button{ margin-top:6px; border:none; border-radius: var(--radius-m); padding:10px; font-size:14px; font-weight:700; background: var(--ink); color: var(--surface); cursor:pointer; }
+  .enter-error{ color: var(--warn); font-size:12.5px; font-weight:600; margin:0; }
