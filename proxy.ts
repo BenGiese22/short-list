@@ -14,6 +14,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!enter|api/revalidate|_next/static|_next/image|favicon.ico).*)',
+    '/((?!enter(?:/|$)|api/revalidate(?:/|$)|_next/static|_next/image|favicon\\.ico).*)',
   ],
 }
