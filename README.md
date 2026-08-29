@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Short List
 
-## Getting Started
+A private, passcode-gated viewer for ranked home listings produced by the
+[home-search](../home-search) pipeline. It shows Ben & Megan's Front Range
+search results — sortable, filterable, with per-listing detail and photos —
+reading from a Turso (libSQL) mirror that `publish.py` keeps in sync with the
+pipeline's local SQLite database.
 
-First, run the development server:
+## Environment variables
+
+Copy `.env.example` to `.env.local` and fill in:
+
+| Variable | Purpose |
+| --- | --- |
+| `TURSO_DATABASE_URL` | Turso database URL the app reads from. |
+| `TURSO_AUTH_TOKEN` | Turso auth token. Use the **read-only** token here — `publish.py` uses a separate read-write token to sync data. |
+| `SITE_PASSCODE` | Passcode required to enter the site. |
+| `COOKIE_SECRET` | Secret used to sign the session cookie issued after a correct passcode. |
+| `REVALIDATE_SECRET` | Shared secret `publish.py` sends to `/api/revalidate` after a sync, so the viewer picks up fresh data without waiting for cache expiry. |
+
+## Running locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
+the passcode gate until you enter `SITE_PASSCODE`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How data gets here
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This app never scrapes or scores listings itself. The `home-search` pipeline
+does that against a local SQLite database, and its `publish.py` script mirrors
+the relevant tables (and listing photos) into Turso and Vercel Blob, then
+calls this app's `/api/revalidate` endpoint so pages regenerate with the new
+data. This site only reads from Turso — it never writes back to the pipeline.
