@@ -109,7 +109,7 @@ function ListingCard({ listing: l }: { listing: Row }) {
 
   const value =
     composite !== null && priceNumeric !== null && priceNumeric > 0
-      ? Math.round((composite / (priceNumeric / 100000)) * 10) / 10
+      ? composite / (priceNumeric / 100000)
       : null
 
   const href = `/listing/${id}`
@@ -156,7 +156,7 @@ function ListingCard({ listing: l }: { listing: Row }) {
           {composite === null ? (
             <div className="composite-mini"><span className="n pending">Pending</span></div>
           ) : (
-            <div className="composite-mini"><span className="n">{composite}</span><span className="l">/100</span></div>
+            <div className="composite-mini"><span className="n">{Math.round(composite)}</span><span className="l">/100</span></div>
           )}
           <div className="mini-eq">
             {MINI_EQ_FIELDS.map((f) => {
@@ -168,12 +168,12 @@ function ListingCard({ listing: l }: { listing: Row }) {
                   key={f.key}
                   className={na ? 'na' : ''}
                   style={{ height: `${height}px` }}
-                  title={`${f.label}: ${na ? 'not scored' : raw}`}
+                  title={`${f.label}: ${na ? 'not scored' : Math.round(raw)}`}
                 />
               )
             })}
           </div>
-          {value !== null ? <span className="value-mini">{value} pts/$100k</span> : null}
+          {value !== null ? <span className="value-mini">{value.toFixed(1)} pts/$100k</span> : null}
         </div>
 
         <div className="row4">

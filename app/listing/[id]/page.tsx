@@ -168,7 +168,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
         ) : (
           <>
             <div className="composite-block">
-              <div className="composite-num">{composite}</div>
+              <div className="composite-num">{Math.round(composite)}</div>
               <div className="composite-meta">
                 <div className="gauge"><i style={{ width: `${composite}%` }} /></div>
                 <p className="composite-caption">Composite score, weighted across the six factors below.</p>
@@ -198,7 +198,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
                 <div className="bar-track">
                   <div className={`bar${na ? ' na' : ''}`} style={{ height: `${height}px` }} />
                 </div>
-                <div className={`val${na ? ' na' : ''}`}>{raw ?? '—'}</div>
+                <div className={`val${na ? ' na' : ''}`}>{raw === null || raw === undefined ? '—' : Math.round(raw)}</div>
                 <div className="lbl">{LABELS[key]}</div>
                 <div className="wt">{WEIGHTS[key]}%</div>
               </div>
@@ -224,7 +224,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
             <div className={`v ${hasLayoutPlan === null ? 'muted' : ''}`}>
               {hasLayoutPlan === null ? 'Not yet checked' : hasLayoutPlan ? 'Found' : 'Not found'}
             </div>
-            {hasLayoutPlan ? <div className="sub">Clarity {layoutPlanClarity}/10</div> : null}
+            {hasLayoutPlan ? <div className="sub">Clarity {layoutPlanClarity !== null ? Math.round(layoutPlanClarity) : '—'}/10</div> : null}
           </div>
           <div className="fact-card">
             <div className="k">Data quality</div>
