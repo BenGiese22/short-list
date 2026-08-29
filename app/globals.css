@@ -108,12 +108,14 @@
     cursor:pointer; align-items:stretch; position: relative;
   }
   /* Stretched-link overlay: makes the whole card open the detail page while
-     keeping the Compass anchor (.row4, above it in stacking order) independently
-     clickable, without nesting an <a> inside another <a>. Not in the mockup
-     (which used a JS click handler + event.stopPropagation instead); added here
-     because that pattern isn't valid in React/HTML. */
+     keeping the Compass anchor (.row4) and the mini-equalizer's hover tooltips
+     (.mini-eq) independently reachable, without nesting an <a> inside another
+     <a>. Not in the mockup (which used a JS click handler + event.stopPropagation
+     instead); added here because that pattern isn't valid in React/HTML.
+     .row4 and .mini-eq are raised above this overlay (z-index:2) at their own
+     rule blocks below, each commented as a Task 7 addition to the mockup's
+     original rule rather than a second, duplicate .row4/.mini-eq block. */
   .card-open-link{ position:absolute; inset:0; z-index:1; }
-  .row4{ position:relative; z-index:2; }
   .thumb-wrap{
     position:relative; flex:none; width: 108px; border-radius: var(--radius-m); overflow:hidden;
     border: 1px solid var(--line); background: var(--surface-2); aspect-ratio: 1/1;
@@ -147,7 +149,13 @@
   .composite-mini .n.pending{ font-size:11.5px; color: var(--ink-3); font-weight:700; }
   .composite-mini .l{ font-size:9.5px; color: var(--ink-3); font-weight:700; text-transform:uppercase; }
 
-  .mini-eq{ display:flex; align-items:flex-end; gap:2.5px; height:22px; flex:none; }
+  /* Task 7 addition: position:relative + z-index:2 raises the bars above
+     .card-open-link so the browser's hover hit-test reaches each <i>'s native
+     `title` tooltip (the addendum's required per-bar tooltip) instead of the
+     stretched card-open-link overlay swallowing the hover. This makes the bars
+     themselves a small non-navigating dead zone within the card, which is
+     acceptable since the tooltip is the point of this element. */
+  .mini-eq{ display:flex; align-items:flex-end; gap:2.5px; height:22px; flex:none; position:relative; z-index:2; }
   .mini-eq i{ display:block; width:5px; border-radius:1.5px 1.5px 0 0; background: var(--accent); }
   .mini-eq i.na{ background: var(--track); }
 
@@ -162,7 +170,10 @@
   .b-pill.garage{ border:1px solid var(--line); color: var(--ink-2); background:none; text-transform:none; font-weight:700; }
   .b-pill.est{ border:1px solid var(--line); color: var(--ink-3); background:none; text-transform:none; font-weight:700; }
 
-  .row4{ display:flex; justify-content:flex-end; }
+  /* position:relative + z-index:2 (Task 7 addition) raises .row4 above
+     .card-open-link so .compass-link inside it stays independently clickable
+     instead of being swallowed by the stretched card overlay. */
+  .row4{ display:flex; justify-content:flex-end; position:relative; z-index:2; }
   .compass-link{
     display:inline-flex; align-items:center; gap:5px; flex:none; font-size: 11.5px; font-weight:800; color: var(--accent);
     padding: 6px 11px; border-radius: 999px; border: 1px solid var(--accent); text-decoration:none;
