@@ -215,6 +215,13 @@
      explicit object-fit, for the same reason as .gallery-main img. */
   .gallery-strip .thumb{ position: relative; }
   .gallery-strip .thumb img{ object-fit: cover; }
+  /* Task 8 fix round: thumbnails became real <button> elements for keyboard
+     accessibility (previously bare divs with only an onClick, unreachable by
+     keyboard). The existing .thumb rule above already sets its own
+     border/background, so this just strips the remaining UA button chrome
+     (padding, inherited font, default alignment) so a <button>.thumb still
+     renders pixel-identical to the div the approved design assumed. */
+  .gallery-strip .thumb{ appearance: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: inherit; }
 
   .staging-alert{ margin: 16px 20px 0; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--radius-m); padding: 13px 14px; display:flex; gap:10px; }
   .staging-alert svg{ flex:none; width:20px; height:20px; color: var(--warn); }

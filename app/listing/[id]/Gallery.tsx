@@ -33,14 +33,16 @@ export function Gallery({ photos }: { photos: { position: number; url: string }[
       {photos.length > 1 ? (
         <div className="gallery-strip">
           {photos.map((p, i) => (
-            <div
+            <button
               key={p.position}
+              type="button"
               className={`thumb${i === activeIndex ? ' active' : ''}`}
-              data-i={i}
+              aria-label={`Photo ${i + 1} of ${photos.length}`}
+              aria-current={i === activeIndex}
               onClick={() => setSelected(i)}
             >
               <Image src={p.url} alt="" fill sizes="72px" />
-            </div>
+            </button>
           ))}
         </div>
       ) : null}
