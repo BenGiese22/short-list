@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Row } from '@libsql/client'
@@ -61,7 +60,22 @@ async function ListingDetail({
 }) {
   const { id } = await params
   const listing = await getListing(id)
-  if (!listing) notFound()
+  if (!listing) {
+    // The route shell (and its 200 status) has already streamed to the
+    // client by the time this resolves inside the Suspense boundary, so
+    // calling notFound() here can't correct the status code -- it would
+    // just resolve the boundary to nothing, leaving a blank page. Render a
+    // real message instead; being told the listing is gone matters more
+    // than the status code the user never sees.
+    return (
+      <>
+        <div className="detail-topbar">
+          <Link href="/" className="back-btn">← All listings</Link>
+        </div>
+        <div className="empty-state">Listing not found.</div>
+      </>
+    )
+  }
   return <ListingDetailBody listing={listing as unknown as Listing} />
 }
 
