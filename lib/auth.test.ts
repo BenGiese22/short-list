@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { signSession, isValidSession } from './auth'
+import { signSession, isValidSession, safeNext } from './auth'
 
 describe('session signing', () => {
   const originalSecret = process.env.COOKIE_SECRET
@@ -29,5 +29,39 @@ describe('session signing', () => {
     const token = signSession()
     process.env.COOKIE_SECRET = 'a-different-secret'
     expect(isValidSession(token)).toBe(false)
+  })
+})
+
+describe('safeNext', () => {
+  it('passes through a site-relative path unchanged', () => {
+    expect(safeNext('/listing/abc')).toBe('/listing/abc')
+  })
+
+  it('falls back to / for a protocol-relative URL', () => {
+    expect(safeNext('//evil.com')).toBe('/')
+  })
+
+  it('falls back to / for a backslash open-redirect variant', () => {
+    expect(safeNext('/\\evil.com')).toBe('/')
+  })
+
+  it('falls back to / for a slash-backslash open-redirect variant', () => {
+    expect(safeNext('/\\/evil.com')).toBe('/')
+  })
+
+  it('falls back to / for an absolute URL', () => {
+    expect(safeNext('https://evil.com')).toBe('/')
+  })
+
+  it('falls back to / for undefined', () => {
+    expect(safeNext(undefined)).toBe('/')
+  })
+
+  it('falls back to / for an empty string', () => {
+    expect(safeNext('')).toBe('/')
+  })
+
+  it('falls back to / for null', () => {
+    expect(safeNext(null)).toBe('/')
   })
 })

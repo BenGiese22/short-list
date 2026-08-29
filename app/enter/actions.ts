@@ -2,22 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { SESSION_COOKIE, signSession } from '../../lib/auth'
-
-// Only allow site-relative paths for `next`. Anything else falls back to
-// '/' to prevent an open redirect through a crafted `?next=` value: an
-// absolute URL, a protocol-relative URL (`//evil.example.com`), or a
-// backslash variant (`/\evil.com`, `/\/evil.com`) that WHATWG URL parsing
-// (browsers, and Node's URL) normalizes to a protocol-relative URL during
-// relative resolution.
-const SAFE_NEXT = /^\/(?!\/|\\)/
-
-export function safeNext(next: string | null | undefined): string {
-  if (!next || !SAFE_NEXT.test(next)) {
-    return '/'
-  }
-  return next
-}
+import { SESSION_COOKIE, signSession, safeNext } from '../../lib/auth'
 
 export async function submitPasscode(formData: FormData) {
   const passcode = formData.get('passcode')
