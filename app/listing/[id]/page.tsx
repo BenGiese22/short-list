@@ -260,11 +260,11 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
             const pct = na ? 0 : Math.round(Math.min(100, Math.max(0, raw)) * 10) / 10
             const commuteMins = key === 'commute' ? denverMinutes : null
             // Same treatment as the commute minutes: the sub-score alone ("50")
-            // never said what the fee actually is. Two lines, because both
-            // cadences matter and neither fits beside the other at this width.
-            const hoaLines =
+            // never said what the fee actually is. Annual only, kept to one
+            // line -- the facts card carries the monthly figure alongside it.
+            const hoaSub =
               key === 'hoa' && hoaAnnual !== null && hoaAnnual > 0
-                ? [`${fmtMoney(Math.round(hoaAnnual))}/yr`, `${fmtMoney(hoaAnnual / 12)}/mo`]
+                ? `${fmtMoney(Math.round(hoaAnnual))}/yr`
                 : null
             return (
               <div key={key} className="eq-bar">
@@ -280,8 +280,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
                     the commute bar off the shared baseline and made the bar
                     heights uncomparable. */}
                 <div className="sub-stat">
-                  <span>{commuteMins !== null ? `${Math.round(commuteMins)} mins` : hoaLines ? hoaLines[0] : '\u00a0'}</span>
-                  <span>{hoaLines ? hoaLines[1] : '\u00a0'}</span>
+                  {commuteMins !== null ? `${Math.round(commuteMins)} mins` : hoaSub ?? '\u00a0'}
                 </div>
                 <div className="wt">{fmtWeight(WEIGHTS[key])}%</div>
               </div>
