@@ -7,12 +7,12 @@ async function seed(db: Client) {
     listing_id TEXT PRIMARY KEY, address TEXT, city TEXT, state TEXT, zip_code TEXT,
     price TEXT, price_numeric REAL, beds INTEGER, baths REAL, sqft INTEGER,
     lot_sqft INTEGER, parking_spaces INTEGER, year_built INTEGER, description TEXT,
-    listing_url TEXT, is_pinned INTEGER
+    listing_url TEXT, is_pinned INTEGER, hoa_annual REAL
   )`)
   await db.execute(`CREATE TABLE scores (
     listing_id TEXT PRIMARY KEY, commute_score REAL, sqft_score REAL,
     condition_score REAL, outdoor_score REAL, room_count_score REAL,
-    parking_score REAL, composite REAL, passes_filters INTEGER,
+    parking_score REAL, hoa_score REAL, composite REAL, passes_filters INTEGER,
     has_incomplete_data INTEGER, computed_at TEXT
   )`)
   await db.execute(`CREATE TABLE visual_scores (
@@ -31,16 +31,16 @@ async function seed(db: Client) {
   )`)
 
   await db.execute(
-    "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0)"
+    "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0, 0)"
   )
   await db.execute(
-    "INSERT INTO scores VALUES ('a', 80, 70, 90, 60, 75, 100, 79, 1, 0, 't')"
+    "INSERT INTO scores VALUES ('a', 80, 70, 90, 60, 75, 100, 52.5, 79, 1, 0, 't')"
   )
   await db.execute(
-    "INSERT INTO listings VALUES ('b', '2 Oak Ave', 'Broomfield', 'CO', '80020', '$500,000', 500000, 3, 2, 1500, 6500, 1, 1990, 'desc', 'https://compass.com/b', 0)"
+    "INSERT INTO listings VALUES ('b', '2 Oak Ave', 'Broomfield', 'CO', '80020', '$500,000', 500000, 3, 2, 1500, 6500, 1, 1990, 'desc', 'https://compass.com/b', 0, NULL)"
   )
   await db.execute(
-    "INSERT INTO scores VALUES ('b', 60, 50, 40, 90, 50, 90, 55, 0, 1, 't')"
+    "INSERT INTO scores VALUES ('b', 60, 50, 40, 90, 50, 90, 50, 55, 0, 1, 't')"
   )
   await db.execute(
     "INSERT INTO visual_scores VALUES ('b', 40, 90, 0, NULL, 1, 1, 0, 'watermark seen', 0, '{}', 't')"
@@ -119,5 +119,35 @@ describe('buildListingsQuery', () => {
     const byId = Object.fromEntries(result.rows.map((r) => [r.listing_id, r.denver_minutes]))
     expect(byId['a']).toBeCloseTo(20.063333)
     expect(byId['b']).toBeNull()
+  })
+})
+
+describe('HOA', () => {
+  let db: Client
+
+  beforeEach(async () => {
+    db = createClient({ url: ':memory:' })
+    await seed(db)
+  })
+
+  it('exposes hoa_annual on cards but not hoa_score, which only the detail view needs', async () => {
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    const a = result.rows.find((r) => r.listing_id === 'a')!
+    expect(a.hoa_annual).toBe(0)
+    // Deliberately unselected: the list view shows no HOA stat, and selecting
+    // it would break the entire list page against a mirror not yet synced
+    // since the HOA migration.
+    expect(a.hoa_score).toBeUndefined()
+  })
+
+  it('returns a null hoa_annual for a listing whose fee was never disclosed', async () => {
+    // 81 of 85 production listings are in this state -- the UI must be able to
+    // tell "not disclosed" apart from a confirmed $0, and they score
+    // differently upstream (50.0 neutral vs 52.5 with the no-fee bonus).
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    const b = result.rows.find((r) => r.listing_id === 'b')!
+    expect(b.hoa_annual).toBeNull()
   })
 })
