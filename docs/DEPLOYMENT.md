@@ -28,13 +28,19 @@ vercel link
 
 ## 2. Provision Turso and Blob
 
+Turso is a Marketplace integration; **Blob is first-party and is NOT** — `vercel
+integration add blob` fails with "No integration found matching blob".
+
 ```bash
-vercel integration add turso
-vercel integration add blob
+vercel integration add turso              # opens a browser to accept Turso's terms,
+                                          # then re-run this command to finish
+vercel blob create-store short-list-photos --access public --yes
 ```
 
-These set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `BLOB_READ_WRITE_TOKEN` as
-project env vars.
+Turso sets `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`; the Blob store sets
+`BLOB_READ_WRITE_TOKEN`. Photos must be `--access public`: the app serves them through
+`next/image` against plain URLs and implements no signed-URL flow, so a private store
+would render nothing.
 
 ## 3. Set the remaining app secrets
 
