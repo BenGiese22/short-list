@@ -1,0 +1,294 @@
+  :root{
+    --bg: hsl(60 10% 97%);
+    --surface: hsl(0 0% 100%);
+    --surface-2: hsl(90 8% 94%);
+    --line: hsl(220 10% 87%);
+    --line-strong: hsl(220 12% 76%);
+    --ink: hsl(220 18% 11%);
+    --ink-2: hsl(220 8% 40%);
+    --ink-3: hsl(220 8% 58%);
+    --accent: hsl(230 70% 52%);
+    --accent-ink: hsl(0 0% 100%);
+    --accent-soft: hsl(230 70% 96%);
+    --amber: hsl(38 88% 40%);
+    --amber-soft: hsl(38 88% 95%);
+    --warn: hsl(4 78% 42%);
+    --warn-ink: hsl(0 0% 100%);
+    --warn-soft: hsl(4 78% 95%);
+    --track: hsl(220 12% 90%);
+    --radius-s: 3px;
+    --radius-m: 6px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-serif: Georgia, Charter, "Times New Roman", serif;
+    --shadow-card: 0 1px 2px hsl(220 20% 10% / 0.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: hsl(222 18% 8%);
+      --surface: hsl(222 16% 12%);
+      --surface-2: hsl(222 14% 16%);
+      --line: hsl(220 12% 22%);
+      --line-strong: hsl(220 12% 30%);
+      --ink: hsl(60 10% 95%);
+      --ink-2: hsl(220 8% 72%);
+      --ink-3: hsl(220 8% 54%);
+      --accent: hsl(228 88% 72%);
+      --accent-ink: hsl(228 40% 12%);
+      --accent-soft: hsl(228 40% 18%);
+      --amber: hsl(40 90% 64%);
+      --amber-soft: hsl(40 60% 16%);
+      --warn: hsl(4 88% 66%);
+      --warn-ink: hsl(4 40% 10%);
+      --warn-soft: hsl(4 55% 16%);
+      --track: hsl(220 14% 22%);
+      --shadow-card: 0 1px 2px hsl(220 40% 2% / 0.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: hsl(222 18% 8%);
+    --surface: hsl(222 16% 12%);
+    --surface-2: hsl(222 14% 16%);
+    --line: hsl(220 12% 22%);
+    --line-strong: hsl(220 12% 30%);
+    --ink: hsl(60 10% 95%);
+    --ink-2: hsl(220 8% 72%);
+    --ink-3: hsl(220 8% 54%);
+    --accent: hsl(228 88% 72%);
+    --accent-ink: hsl(228 40% 12%);
+    --accent-soft: hsl(228 40% 18%);
+    --amber: hsl(40 90% 64%);
+    --amber-soft: hsl(40 60% 16%);
+    --warn: hsl(4 88% 66%);
+    --warn-ink: hsl(4 40% 10%);
+    --warn-soft: hsl(4 55% 16%);
+    --track: hsl(220 14% 22%);
+    --shadow-card: 0 1px 2px hsl(220 40% 2% / 0.4);
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg); color: var(--ink); font-family: var(--font);
+    -webkit-font-smoothing: antialiased; line-height: 1.45;
+  }
+  img,svg{ display:block; max-width:100%; }
+  button{ font-family: inherit; }
+  a{ color: inherit; }
+  .hidden{ display:none !important; }
+
+  header.app{ position: sticky; top:0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .app-inner{ max-width: 900px; margin: 0 auto; padding: 18px 20px 14px; }
+  .brand{ display:flex; align-items:baseline; justify-content: space-between; gap: 10px; }
+  .brand h1{ margin:0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  .brand .count{ font-size: 12px; color: var(--ink-3); font-weight:600; letter-spacing: 0.02em; }
+  .tagline{ margin: 2px 0 14px; font-size: 13px; color: var(--ink-2); }
+
+  .controls{ display:flex; flex-direction:column; gap:10px; }
+  .row-controls{ display:flex; gap:8px; }
+  .search{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; background: var(--surface); border:1px solid var(--line); border-radius: var(--radius-m); padding: 9px 12px; }
+  .search svg{ flex:none; opacity:0.5; width:18px; height:18px; }
+  .search input{ border:none; outline:none; background:transparent; color:var(--ink); font-size: 14px; width:100%; font-family: inherit; }
+  .search input::placeholder{ color: var(--ink-3); }
+  select.sort{
+    appearance:none; -webkit-appearance:none; background: var(--surface); border:1px solid var(--line); color: var(--ink);
+    border-radius: var(--radius-m); padding: 9px 30px 9px 12px; font-size:13px; font-weight:600;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23888'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .chips{ display:flex; gap:6px; flex-wrap:wrap; }
+  .chip{ border:1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12px; font-weight:600; padding: 6px 11px; border-radius: 999px; cursor:pointer; letter-spacing:0.01em; white-space:nowrap; }
+  .chip[aria-pressed="true"]{ background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip.warn-chip[aria-pressed="true"]{ background: var(--warn); border-color: var(--warn); color: var(--warn-ink); }
+
+  /* ---------- dense list ---------- */
+  main#list-view{ max-width: 900px; margin: 0 auto; padding: 10px 20px 80px; }
+  .empty-state{ text-align:center; color: var(--ink-3); padding: 60px 10px; font-size:14px; }
+
+  .card{
+    display:flex; gap: 14px; padding: 14px 4px; border-bottom: 1px solid var(--line);
+    cursor:pointer; align-items:stretch; position: relative;
+  }
+  /* Stretched-link overlay: makes the whole card open the detail page while
+     keeping the Compass anchor (.row4) and the mini-equalizer's hover tooltips
+     (.mini-eq) independently reachable, without nesting an <a> inside another
+     <a>. Not in the mockup (which used a JS click handler + event.stopPropagation
+     instead); added here because that pattern isn't valid in React/HTML.
+     .row4 and .mini-eq are raised above this overlay (z-index:2) at their own
+     rule blocks below, each commented as a Task 7 addition to the mockup's
+     original rule rather than a second, duplicate .row4/.mini-eq block. */
+  .card-open-link{ position:absolute; inset:0; z-index:1; }
+  .thumb-wrap{
+    position:relative; flex:none; width: 108px; border-radius: var(--radius-m); overflow:hidden;
+    border: 1px solid var(--line); background: var(--surface-2); aspect-ratio: 1/1;
+  }
+  .thumb-wrap svg{ width:100%; height:100%; }
+  /* The mockup filled .thumb-wrap with generated placeholder SVG art (no real
+     photos existed yet); this renders a real next/image via Amendment B, which
+     needs an explicit object-fit so photos of any aspect ratio fill the square
+     thumbnail without distortion. */
+  .thumb-wrap img{ object-fit: cover; }
+  .thumb-flag{
+    position:absolute; top:4px; left:4px; width:16px; height:16px; border-radius:3px;
+    display:flex; align-items:center; justify-content:center; background: var(--warn); color:#fff;
+  }
+  .thumb-flag svg{ width:10px; height:10px; }
+
+  .card-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .row1{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .addr{ font-size: 14.5px; font-weight:800; letter-spacing:-0.01em; margin:0; }
+  .city{ font-size: 11.5px; color: var(--ink-2); margin: 1px 0 0; font-weight:600; }
+  .price{ font-size: 14.5px; font-weight:800; white-space:nowrap; font-variant-numeric: tabular-nums; }
+
+  .row2{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .facts-inline{ font-size:11.5px; color: var(--ink-2); font-weight:600; display:flex; gap:8px; flex-wrap:wrap;}
+  .facts-inline b{ color:var(--ink); font-weight:800; }
+  .dot{ opacity:0.4; }
+
+  .row3{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:auto; }
+  .composite-mini{ display:flex; align-items:baseline; gap:3px; flex:none; }
+  .composite-mini .n{ font-size:19px; font-weight:800; font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
+  .composite-mini .n.pending{ font-size:11.5px; color: var(--ink-3); font-weight:700; }
+  .composite-mini .l{ font-size:9.5px; color: var(--ink-3); font-weight:700; text-transform:uppercase; }
+
+  /* Task 7 addition: position:relative + z-index:2 raises the bars above
+     .card-open-link so the browser's hover hit-test reaches each <i>'s native
+     `title` tooltip (the addendum's required per-bar tooltip) instead of the
+     stretched card-open-link overlay swallowing the hover. This makes the bars
+     themselves a small non-navigating dead zone within the card, which is
+     acceptable since the tooltip is the point of this element. */
+  .mini-eq{ display:flex; align-items:flex-end; gap:2.5px; height:22px; flex:none; position:relative; z-index:2; }
+  .mini-eq i{ display:block; width:5px; border-radius:1.5px 1.5px 0 0; background: var(--accent); }
+  .mini-eq i.na{ background: var(--track); }
+
+  .value-mini{ font-size:11px; font-weight:700; color: var(--amber); background: var(--amber-soft); padding:3px 7px; border-radius: 999px; flex:none; }
+
+  .badges-inline{ display:flex; gap:5px; flex-wrap:wrap; }
+  .b-pill{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; padding: 3px 7px; border-radius: 3px; display:inline-flex; align-items:center; gap:3px; }
+  .b-pill svg{ width:9px; height:9px; }
+  .b-pill.staged{ background: var(--warn); color: var(--warn-ink); }
+  .b-pill.cutoff{ background: var(--amber); color:#fff; }
+  .b-pill.pending{ background: hsl(220 8% 40% / 0.16); color: var(--ink-2); }
+  .b-pill.garage{ border:1px solid var(--line); color: var(--ink-2); background:none; text-transform:none; font-weight:700; }
+  .b-pill.est{ border:1px solid var(--line); color: var(--ink-3); background:none; text-transform:none; font-weight:700; }
+
+  /* position:relative + z-index:2 (Task 7 addition) raises .row4 above
+     .card-open-link so .compass-link inside it stays independently clickable
+     instead of being swallowed by the stretched card overlay. */
+  .row4{ display:flex; justify-content:flex-end; position:relative; z-index:2; }
+  .compass-link{
+    display:inline-flex; align-items:center; gap:5px; flex:none; font-size: 11.5px; font-weight:800; color: var(--accent);
+    padding: 6px 11px; border-radius: 999px; border: 1px solid var(--accent); text-decoration:none;
+  }
+  .compass-link:hover{ background: var(--accent-soft); }
+  .compass-link svg{ width:11px; height:11px; }
+
+  footer.app-footer{ max-width:900px; margin: 0 auto; padding: 30px 20px 50px; color: var(--ink-3); font-size: 12px; text-align:center; }
+
+  @media (max-width: 560px){
+    .thumb-wrap{ width:80px; }
+    .addr{ font-size:13.5px; }
+    .row3{ gap:8px; }
+  }
+
+  /* ---------- detail view (shared language, same as calm variant) ---------- */
+  main#detail-view{ max-width: 720px; margin: 0 auto; padding: 0 0 90px; }
+  .detail-topbar{ position: sticky; top:0; z-index: 15; background: var(--bg); border-bottom: 1px solid var(--line); padding: 14px 20px; display:flex; align-items:center; justify-content:space-between; gap: 10px; }
+  .back-btn{ background:none; border:none; color: var(--ink); font-size: 13.5px; font-weight:700; display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 4px; }
+  .back-btn svg{ width:15px; height:15px; }
+  .detail-compass{ display:inline-flex; align-items:center; gap:6px; background: var(--ink); color: var(--bg); font-size: 12.5px; font-weight:800; padding: 8px 13px; border-radius: 999px; text-decoration:none; }
+  .detail-compass svg{ width:12px; height:12px; }
+
+  .gallery{ padding: 16px 20px 0; }
+  .gallery-main{ position:relative; border-radius: var(--radius-m); overflow:hidden; border:1px solid var(--line); aspect-ratio: 4/3; background: var(--surface-2); }
+  .gallery-main svg{ width:100%; height:100%; }
+  /* Task 8: the mockup only ever filled .gallery-main/.thumb with generated SVG
+     placeholder art (which fills its box by definition); a real next/image
+     `fill` needs an explicit object-fit so photos of any aspect ratio crop
+     instead of distorting. Same justification as Task 7's .thumb-wrap img rule. */
+  .gallery-main img{ object-fit: cover; }
+  .gallery-count{ position:absolute; bottom:10px; right:10px; background: hsl(220 8% 15% / 0.72); color:#fff; font-size:11px; font-weight:700; padding: 4px 9px; border-radius: 999px; }
+  .gallery-strip{ display:flex; gap:8px; margin-top:8px; overflow-x:auto; padding-bottom:2px; }
+  .gallery-strip .thumb{ flex: none; width: 72px; aspect-ratio: 4/3; border-radius: 4px; overflow:hidden; border: 2px solid transparent; cursor:pointer; background: var(--surface-2); }
+  .gallery-strip .thumb.active{ border-color: var(--accent); }
+  .gallery-strip svg{ width:100%; height:100%; }
+  /* Task 8, additive only (existing .gallery-strip .thumb rule above left
+     untouched): next/image `fill` requires a positioned ancestor and an
+     explicit object-fit, for the same reason as .gallery-main img. */
+  .gallery-strip .thumb{ position: relative; }
+  .gallery-strip .thumb img{ object-fit: cover; }
+  /* Task 8 fix round: thumbnails became real <button> elements for keyboard
+     accessibility (previously bare divs with only an onClick, unreachable by
+     keyboard). The existing .thumb rule above already sets its own
+     border/background, so this just strips the remaining UA button chrome
+     (padding, inherited font, default alignment) so a <button>.thumb still
+     renders pixel-identical to the div the approved design assumed. */
+  .gallery-strip .thumb{ appearance: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: inherit; }
+
+  .staging-alert{ margin: 16px 20px 0; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--radius-m); padding: 13px 14px; display:flex; gap:10px; }
+  .staging-alert svg{ flex:none; width:20px; height:20px; color: var(--warn); }
+  .staging-alert .t{ font-size:13px; font-weight:800; color: var(--warn); margin:0 0 3px; letter-spacing:-0.01em; }
+  .staging-alert .d{ font-size:12.5px; color: var(--ink); margin:0; line-height:1.4; }
+
+  .cutoff-alert{ margin: 16px 20px 0; background: var(--amber-soft); border: 1px solid var(--amber); border-radius: var(--radius-m); padding: 13px 14px; }
+  .cutoff-alert .t{ font-size:13px; font-weight:800; color: var(--amber); margin:0 0 4px; }
+  .cutoff-alert ul{ margin:2px 0 0; padding-left:18px; font-size:12.5px; color: var(--ink); }
+
+  .detail-head{ padding: 20px 20px 0; }
+  .detail-head h2{ font-size: 26px; font-weight: 800; letter-spacing:-0.02em; margin: 0 0 2px; }
+  .detail-head .sub{ font-size: 14px; color: var(--ink-2); font-weight:600; margin:0; }
+  .detail-price{ font-size: 20px; font-weight:800; margin-top:10px; font-variant-numeric: tabular-nums; }
+
+  .stat-strip{ display:flex; gap:0; margin: 16px 20px 0; border:1px solid var(--line); border-radius: var(--radius-m); overflow:hidden; }
+  .stat{ flex:1; padding: 12px 8px; text-align:center; border-right:1px solid var(--line); }
+  .stat:last-child{ border-right:none; }
+  .stat .v{ font-size:16px; font-weight:800; font-variant-numeric: tabular-nums; }
+  .stat .k{ font-size:10.5px; color: var(--ink-3); font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:2px; }
+
+  .section{ padding: 26px 20px 0; }
+  .section h3{ font-size: 12.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color: var(--ink-3); margin:0 0 12px; }
+
+  .composite-block{ display:flex; align-items:center; gap:18px; }
+  .composite-num{ font-size: 46px; font-weight:800; letter-spacing:-0.03em; font-variant-numeric: tabular-nums; line-height:1; }
+  .composite-num.pending-num{ font-size: 22px; color: var(--ink-3); }
+  .composite-meta{ flex:1; }
+  .gauge{ height:8px; background: var(--track); border-radius: 999px; overflow:hidden; }
+  .gauge > i{ display:block; height:100%; background: var(--accent); border-radius:999px; }
+  .composite-caption{ font-size:12px; color: var(--ink-2); margin-top:7px; font-weight:600; }
+  .value-chip{ margin-top: 12px; display:inline-flex; align-items:baseline; gap:6px; background: var(--amber-soft); color: var(--amber); border-radius: 6px; padding: 8px 12px; }
+  .value-chip .n{ font-size:15px; font-weight:800; font-variant-numeric: tabular-nums; }
+  .value-chip .l{ font-size:11px; font-weight:700; }
+  .value-note{ font-size:11px; color: var(--ink-3); margin-top:6px; }
+
+  .eq{ display:flex; gap: 14px; align-items:flex-end; height: 90px; margin-top: 4px; }
+  .eq-bar{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .eq-bar .bar-track{ flex:1; width:100%; max-width:26px; display:flex; align-items:flex-end; }
+  .eq-bar .bar{ width:100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height:3px; }
+  .eq-bar .bar.na{ background: var(--track); }
+  .eq-bar .val{ font-size:11px; font-weight:800; margin-top:6px; font-variant-numeric: tabular-nums; }
+  .eq-bar .val.na{ color: var(--ink-3); }
+  .eq-bar .lbl{ font-size: 9.5px; font-weight:700; color: var(--ink-3); text-transform:uppercase; letter-spacing:0.03em; margin-top:2px; }
+  .eq-bar .wt{ font-size: 9px; color: var(--ink-3); opacity:0.7; }
+
+  .fact-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .fact-card{ border:1px solid var(--line); border-radius: var(--radius-m); padding: 12px 13px; }
+  .fact-card .k{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color: var(--ink-3); display:flex; align-items:center; gap:5px;}
+  .fact-card .k svg{ width:12px; height:12px; }
+  .fact-card .v{ font-size:14px; font-weight:800; margin-top:5px; }
+  .fact-card .v.warn{ color: var(--warn); }
+  .fact-card .v.muted{ color: var(--ink-3); font-weight:700; }
+  .fact-card .sub{ font-size:11.5px; color: var(--ink-2); margin-top:3px; font-weight:600; }
+
+  .desc{ font-family: var(--font-serif); font-size: 15.5px; line-height:1.65; color: var(--ink); margin:0; }
+  .amenities{ display:flex; flex-wrap:wrap; gap:7px; }
+  .amenity{ font-size:12.5px; font-weight:600; border:1px solid var(--line); border-radius:999px; padding:6px 11px; color: var(--ink-2); }
+
+  .sticky-cta{ position: sticky; bottom:0; margin-top: 30px; padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 60%, transparent); }
+  .sticky-cta a{ display:flex; align-items:center; justify-content:center; gap:8px; background: var(--ink); color: var(--bg); font-weight:800; font-size:14.5px; padding: 15px; border-radius: var(--radius-m); text-decoration:none; }
+  .sticky-cta svg{ width:14px; height:14px; }
+
+  .enter-page{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; font-family: var(--font); }
+  .enter-page form{ width:100%; max-width:320px; background: var(--surface); border:1px solid var(--line); border-radius: var(--radius-m); padding:28px 24px; display:flex; flex-direction:column; gap:10px; }
+  .enter-page h1{ margin:0 0 8px; font-size:18px; font-weight:800; color: var(--ink); }
+  .enter-page label{ font-size:12px; font-weight:700; color: var(--ink-2); }
+  .enter-page input{ border:1px solid var(--line); border-radius: var(--radius-m); padding:9px 12px; font-size:14px; font-family: inherit; color: var(--ink); background: var(--surface); }
+  .enter-page button{ margin-top:6px; border:none; border-radius: var(--radius-m); padding:10px; font-size:14px; font-weight:700; background: var(--ink); color: var(--surface); cursor:pointer; }
+  .enter-error{ color: var(--warn); font-size:12.5px; font-weight:600; margin:0; }
