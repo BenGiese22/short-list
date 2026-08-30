@@ -254,9 +254,15 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
                 </div>
                 <div className={`val${na ? ' na' : ''}`}>{raw === null || raw === undefined ? '—' : Math.round(raw)}</div>
                 <div className="lbl">{LABELS[key]}</div>
-                {commuteMins !== null ? (
-                  <div className="sub-stat">{Math.round(commuteMins)} mins</div>
-                ) : null}
+                {/* Rendered in EVERY column, empty where there is nothing to
+                    say. Only the commute factor has a sub-stat, and omitting
+                    the element elsewhere made that column one line taller than
+                    its neighbours -- which, with the row bottom-aligned, lifted
+                    the commute bar off the shared baseline and made the bar
+                    heights uncomparable. */}
+                <div className="sub-stat">
+                  {commuteMins !== null ? `${Math.round(commuteMins)} mins` : '\u00a0'}
+                </div>
                 <div className="wt">{fmtWeight(WEIGHTS[key])}%</div>
               </div>
             )

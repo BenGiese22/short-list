@@ -307,6 +307,18 @@
   .hoa-toggle button:hover{ color: var(--ink-2); }
   .hoa-toggle button.active{ background: var(--accent-soft); color: var(--accent); }
   @media (max-width: 560px){
+    /* The HOA factor made this a seven-column chart, which overflowed a
+       ~390px viewport at the desktop gap and type scale -- the last bar was
+       clipped off the right edge. These MUST live in this later media block:
+       an earlier one loses to the plain `.eq` rule above on source order at
+       equal specificity, which is why an identical set higher up silently did
+       nothing. Tightened rather than made scrollable -- a chart you have to
+       scroll cannot be compared at a glance, which is its only purpose. */
+    .eq{ gap:4px; }
+    .eq-bar .lbl{ font-size:7.5px; letter-spacing:0; }
+    .eq-bar .val{ font-size:10px; }
+    .eq-bar .sub-stat{ font-size:8.5px; }
+    .eq-bar .wt{ font-size:8px; }
     /* 44px tap targets on mobile, same rule as .compass-link. */
     .hoa-toggle button{ min-height:44px; padding:0 16px; }
   }
