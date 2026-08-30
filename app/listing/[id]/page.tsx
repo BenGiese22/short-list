@@ -3,7 +3,6 @@ import { Suspense } from 'react'
 import type { Row } from '@libsql/client'
 import { getListing } from '@/lib/queries'
 import { Gallery } from './Gallery'
-import { HoaFigure } from './HoaFigure'
 
 // getListing() returns the spread of a libsql `Row` (a `[name: string]: Value`
 // index-signature object) plus `amenities`/`photos`. TypeScript's inference of
@@ -43,14 +42,27 @@ function fmtWeight(weight: number): string {
  *  never disclosed (which scores a neutral 50), 0 means a confirmed absence of
  *  HOA, and a positive value is the annualized fee in dollars. Keying off the
  *  score would conflate "unknown" with "cheap". */
-function hoaFact(hoaAnnual: number | null): { text: string; cls: string } | null {
+/** Whole dollars for the annual figure; the monthly one keeps cents when the
+ *  division is not clean, so $3,050/yr reads as $254.17/mo rather than a $254
+ *  that quietly loses two dollars a year. */
+function fmtMoney(amount: number): string {
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function hoaFact(hoaAnnual: number | null): { text: string; cls: string } {
   if (hoaAnnual === null || hoaAnnual === undefined) {
     return { text: 'Not disclosed', cls: 'muted' }
   }
   if (hoaAnnual <= 0) return { text: 'None', cls: '' }
-  // A real fee is worth showing per-year and per-month, which needs state --
-  // null here routes the card to the HoaFigure client component instead.
-  return null
+  // Both figures rather than a toggle: they fit side by side, so hiding one
+  // behind a click bought nothing.
+  return {
+    text: `${fmtMoney(Math.round(hoaAnnual))}/yr · ${fmtMoney(hoaAnnual / 12)}/mo`,
+    cls: 'warn',
+  }
 }
 const EQ_KEYS = Object.keys(WEIGHTS)
 
@@ -247,6 +259,13 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
             // score still cannot escape its track.
             const pct = na ? 0 : Math.round(Math.min(100, Math.max(0, raw)) * 10) / 10
             const commuteMins = key === 'commute' ? denverMinutes : null
+            // Same treatment as the commute minutes: the sub-score alone ("50")
+            // never said what the fee actually is. Two lines, because both
+            // cadences matter and neither fits beside the other at this width.
+            const hoaLines =
+              key === 'hoa' && hoaAnnual !== null && hoaAnnual > 0
+                ? [`${fmtMoney(Math.round(hoaAnnual))}/yr`, `${fmtMoney(hoaAnnual / 12)}/mo`]
+                : null
             return (
               <div key={key} className="eq-bar">
                 <div className="bar-track">
@@ -261,7 +280,8 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
                     the commute bar off the shared baseline and made the bar
                     heights uncomparable. */}
                 <div className="sub-stat">
-                  {commuteMins !== null ? `${Math.round(commuteMins)} mins` : '\u00a0'}
+                  <span>{commuteMins !== null ? `${Math.round(commuteMins)} mins` : hoaLines ? hoaLines[0] : '\u00a0'}</span>
+                  <span>{hoaLines ? hoaLines[1] : '\u00a0'}</span>
                 </div>
                 <div className="wt">{fmtWeight(WEIGHTS[key])}%</div>
               </div>
@@ -280,11 +300,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
           </div>
           <div className="fact-card">
             <div className="k">HOA</div>
-            {hoa ? (
-              <div className={`v ${hoa.cls}`}>{hoa.text}</div>
-            ) : (
-              <HoaFigure hoaAnnual={hoaAnnual as number} />
-            )}
+            <div className={`v ${hoa.cls} hoa-v`}>{hoa.text}</div>
           </div>
           <div className="fact-card">
             <div className="k">Staging</div>

@@ -273,7 +273,11 @@
   .value-chip .l{ font-size:11px; font-weight:700; }
   .value-note{ font-size:11px; color: var(--ink-3); margin-top:6px; }
 
-  .eq{ display:flex; gap: 14px; align-items:flex-end; height: 90px; margin-top: 4px; }
+  /* Height raised from the mockup's 90px: the sub-stat slot is now two fixed
+     lines (HOA shows a yearly and a monthly figure), and at 90px that extra
+     line ate into the bars until they were too squat to compare -- which is
+     the one job this chart has. */
+  .eq{ display:flex; gap: 14px; align-items:flex-end; height: 145px; margin-top: 4px; }
   .eq-bar{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
   .eq-bar .bar-track{ flex:1; width:100%; max-width:26px; display:flex; align-items:flex-end; }
   .eq-bar .bar{ width:100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height:3px; }
@@ -284,7 +288,11 @@
   /* Real commute time under the commute factor's label -- the score alone
      ("88") does not answer "how far is it?". Only rendered when the listing
      has commute data; 17 of 85 failed geocoding. */
-  .eq-bar .sub-stat{ font-size:10px; font-weight:800; color: var(--ink-2); margin-top:1px; font-variant-numeric: tabular-nums; }
+  /* Two fixed lines in every column. HOA uses both (yearly and monthly),
+     commute uses one, the rest use none -- but the slot is always the same
+     height, so no column can lift its bar off the shared baseline. */
+  .eq-bar .sub-stat{ display:flex; flex-direction:column; margin-top:1px; font-variant-numeric: tabular-nums; }
+  .eq-bar .sub-stat span{ font-size:10px; font-weight:800; color: var(--ink-2); line-height:1.25; white-space:nowrap; }
   .eq-bar .wt{ font-size: 9px; color: var(--ink-3); opacity:0.7; }
 
   .fact-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
@@ -296,16 +304,7 @@
   /* HOA split button: a known fee is shown per-year or per-month. Sized to sit
      inside a fact card without changing its rhythm, and built from the existing
      tokens so both themes keep working. */
-  .hoa-figure{ display:flex; align-items:baseline; gap:3px; font-variant-numeric: tabular-nums; }
-  .hoa-figure .hoa-basis{ font-size:11px; font-weight:700; color: var(--ink-3); }
-  .hoa-toggle{ display:inline-flex; margin-top:8px; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
-  .hoa-toggle button{
-    appearance:none; background:none; border:0; cursor:pointer; font:inherit;
-    font-size:10.5px; font-weight:800; letter-spacing:0.02em; color: var(--ink-3);
-    padding:5px 11px; min-height:30px;
-  }
-  .hoa-toggle button:hover{ color: var(--ink-2); }
-  .hoa-toggle button.active{ background: var(--accent-soft); color: var(--accent); }
+  .fact-card .v.hoa-v{ font-variant-numeric: tabular-nums; font-size:13px; }
   @media (max-width: 560px){
     /* The HOA factor made this a seven-column chart, which overflowed a
        ~390px viewport at the desktop gap and type scale -- the last bar was
@@ -317,10 +316,9 @@
     .eq{ gap:4px; }
     .eq-bar .lbl{ font-size:7.5px; letter-spacing:0; }
     .eq-bar .val{ font-size:10px; }
-    .eq-bar .sub-stat{ font-size:8.5px; }
+    .eq-bar .sub-stat span{ font-size:8px; }
     .eq-bar .wt{ font-size:8px; }
     /* 44px tap targets on mobile, same rule as .compass-link. */
-    .hoa-toggle button{ min-height:44px; padding:0 16px; }
   }
   .fact-card .v.muted{ color: var(--ink-3); font-weight:700; }
   .fact-card .sub{ font-size:11.5px; color: var(--ink-2); margin-top:3px; font-weight:600; }
