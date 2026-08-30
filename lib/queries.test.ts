@@ -25,6 +25,10 @@ async function seed(db: Client) {
     listing_id TEXT NOT NULL, position INTEGER NOT NULL, blob_url TEXT NOT NULL,
     PRIMARY KEY (listing_id, position)
   )`)
+  await db.execute(`CREATE TABLE commute (
+    listing_id TEXT PRIMARY KEY, denver_miles REAL, denver_minutes REAL,
+    medtronic_miles REAL, medtronic_minutes REAL
+  )`)
 
   await db.execute(
     "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0)"
@@ -44,6 +48,11 @@ async function seed(db: Client) {
   await db.execute(
     "INSERT INTO hosted_photos VALUES ('a', 0, 'https://blob.example.com/a-0.jpg')"
   )
+  await db.execute(
+    "INSERT INTO commute VALUES ('a', 12.4, 20.063333, 15.1, 25.5)"
+  )
+  // 'b' intentionally has no commute row, matching production listings whose
+  // geocoding failed -- denver_minutes must come back NULL, not throw.
 }
 
 describe('buildListingsQuery', () => {
@@ -101,6 +110,14 @@ describe('buildListingsQuery', () => {
     const result = await db.execute({ sql, args })
     const byId = Object.fromEntries(result.rows.map((r) => [r.listing_id, r.thumbnail_url]))
     expect(byId['a']).toBe('https://blob.example.com/a-0.jpg')
+    expect(byId['b']).toBeNull()
+  })
+
+  it('includes denver_minutes from the commute table, or null when no commute row exists', async () => {
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    const byId = Object.fromEntries(result.rows.map((r) => [r.listing_id, r.denver_minutes]))
+    expect(byId['a']).toBeCloseTo(20.063333)
     expect(byId['b']).toBeNull()
   })
 })
