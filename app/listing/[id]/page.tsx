@@ -100,6 +100,11 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
   const yearBuilt = l.year_built as number | null
 
   const garageAttached = l.garage_attached as number | null
+  // 68 of 85 listings have commute minutes; the rest failed geocoding.
+  const denverMinutes = l.denver_minutes as number | null
+  // 78 of 85 listings have an empty description upstream in the scraper, so
+  // render nothing at all rather than a heading over blank space.
+  const description = ((l.description as string | null) ?? '').trim() || null
   const garage =
     garageAttached === 1
       ? { text: 'Attached', cls: '' }
@@ -206,14 +211,22 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
           {EQ_KEYS.map((key) => {
             const raw = l[SCORE_FIELD[key]] as number | null
             const na = raw === null || raw === undefined
-            const height = na ? 4 : Math.max(4, Math.round(raw * 0.86))
+            // Percentage of the track, not absolute pixels: a 97 score used to
+            // render an 83px bar inside a 90px container and overflow upward
+            // across the section heading. Clamped so a stray out-of-range
+            // score still cannot escape its track.
+            const pct = na ? 0 : Math.round(Math.min(100, Math.max(0, raw)) * 10) / 10
+            const commuteMins = key === 'commute' ? denverMinutes : null
             return (
               <div key={key} className="eq-bar">
                 <div className="bar-track">
-                  <div className={`bar${na ? ' na' : ''}`} style={{ height: `${height}px` }} />
+                  <div className={`bar${na ? ' na' : ''}`} style={{ height: `${pct}%` }} />
                 </div>
                 <div className={`val${na ? ' na' : ''}`}>{raw === null || raw === undefined ? '—' : Math.round(raw)}</div>
                 <div className="lbl">{LABELS[key]}</div>
+                {commuteMins !== null ? (
+                  <div className="sub-stat">{Math.round(commuteMins)} mins</div>
+                ) : null}
                 <div className="wt">{WEIGHTS[key]}%</div>
               </div>
             )
@@ -249,10 +262,12 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
         </div>
       </div>
 
-      <div className="section">
-        <h3>Description</h3>
-        <p className="desc">{l.description as string | null}</p>
-      </div>
+      {description ? (
+        <div className="section">
+          <h3>Description</h3>
+          <p className="desc">{description}</p>
+        </div>
+      ) : null}
 
       <div className="section">
         <h3>Amenities</h3>

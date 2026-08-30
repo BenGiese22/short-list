@@ -5,15 +5,6 @@ import type { Row } from '@libsql/client'
 import { getListings, type SortKey } from '@/lib/queries'
 import { ListControls } from './ListControls'
 
-const MINI_EQ_FIELDS: { key: string; label: string; column: string }[] = [
-  { key: 'commute', label: 'Commute', column: 'commute_score' },
-  { key: 'sqft', label: 'Sqft', column: 'sqft_score' },
-  { key: 'condition', label: 'Condition', column: 'condition_score' },
-  { key: 'outdoor', label: 'Outdoor', column: 'outdoor_score' },
-  { key: 'room', label: 'Rooms', column: 'room_count_score' },
-  { key: 'parking', label: 'Parking', column: 'parking_score' },
-]
-
 export default function HomePage({
   searchParams,
 }: {
@@ -106,6 +97,10 @@ function ListingCard({ listing: l }: { listing: Row }) {
   const pending = l.photo_score_unavailable === 1 || l.photo_score_unavailable === null
   const garageAttached = l.garage_attached as number | null
   const hasIncompleteData = l.has_incomplete_data === 1
+  // Only 68 of 85 listings have commute minutes (geocoding failed for the
+  // rest), so this must render nothing rather than "null min".
+  const commuteMinutes = l.denver_minutes as number | null
+  const outdoor = l.outdoor_score as number | null
 
   const value =
     composite !== null && priceNumeric !== null && priceNumeric > 0
@@ -119,7 +114,9 @@ function ListingCard({ listing: l }: { listing: Row }) {
       <Link href={href} className="card-open-link" aria-label={`Open ${address}`} />
 
       <div className="thumb-wrap">
-        {thumbnailUrl ? <Image src={thumbnailUrl} alt="" fill sizes="120px" /> : null}
+        {thumbnailUrl ? (
+          <Image src={thumbnailUrl} alt="" fill sizes="(max-width: 560px) 96px, 140px" />
+        ) : null}
         {staged ? (
           <div className="thumb-flag">
             <WarnIcon />
@@ -158,25 +155,21 @@ function ListingCard({ listing: l }: { listing: Row }) {
           ) : (
             <div className="composite-mini"><span className="n">{Math.round(composite)}</span><span className="l">/100</span></div>
           )}
-          <div className="mini-eq">
-            {MINI_EQ_FIELDS.map((f) => {
-              const raw = l[f.column] as number | null
-              const na = raw === null || raw === undefined
-              const height = na ? 3 : Math.max(3, Math.round(raw * 0.2))
-              return (
-                <i
-                  key={f.key}
-                  className={na ? 'na' : ''}
-                  style={{ height: `${height}px` }}
-                  title={`${f.label}: ${na ? 'not scored' : Math.round(raw)}`}
-                />
-              )
-            })}
+          <div className="mini-stats">
+            {commuteMinutes !== null ? (
+              <span className="mini-stat">
+                <span className="n">{Math.round(commuteMinutes)}</span>
+                <span className="l">min commute</span>
+              </span>
+            ) : null}
+            {outdoor !== null ? (
+              <span className="mini-stat">
+                <span className="n">{Math.round(outdoor)}</span>
+                <span className="l">outdoor</span>
+              </span>
+            ) : null}
           </div>
           {value !== null ? <span className="value-mini">{value.toFixed(1)} pts/$100k</span> : null}
-        </div>
-
-        <div className="row4">
           <a className="compass-link" href={listingUrl} target="_blank" rel="noopener">
             Compass ↗
           </a>

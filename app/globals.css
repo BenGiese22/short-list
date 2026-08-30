@@ -108,17 +108,16 @@
     cursor:pointer; align-items:stretch; position: relative;
   }
   /* Stretched-link overlay: makes the whole card open the detail page while
-     keeping the Compass anchor (.row4) and the mini-equalizer's hover tooltips
-     (.mini-eq) independently reachable, without nesting an <a> inside another
-     <a>. Not in the mockup (which used a JS click handler + event.stopPropagation
-     instead); added here because that pattern isn't valid in React/HTML.
-     .row4 and .mini-eq are raised above this overlay (z-index:2) at their own
-     rule blocks below, each commented as a Task 7 addition to the mockup's
-     original rule rather than a second, duplicate .row4/.mini-eq block. */
+     keeping the Compass anchor (.compass-link) independently reachable,
+     without nesting an <a> inside another <a>. Not in the mockup (which used
+     a JS click handler + event.stopPropagation instead); added here because
+     that pattern isn't valid in React/HTML. .compass-link is raised above
+     this overlay (position:relative + z-index:2, at its own rule below,
+     commented as a Task 7 addition) so it stays independently clickable. */
   .card-open-link{ position:absolute; inset:0; z-index:1; }
   .thumb-wrap{
-    position:relative; flex:none; width: 108px; border-radius: var(--radius-m); overflow:hidden;
-    border: 1px solid var(--line); background: var(--surface-2); aspect-ratio: 1/1;
+    position:relative; flex:none; width: 140px; border-radius: var(--radius-m); overflow:hidden;
+    border: 1px solid var(--line); background: var(--surface-2); aspect-ratio: 4/3;
   }
   .thumb-wrap svg{ width:100%; height:100%; }
   /* The mockup filled .thumb-wrap with generated placeholder SVG art (no real
@@ -136,28 +135,32 @@
   .row1{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
   .addr{ font-size: 14.5px; font-weight:800; letter-spacing:-0.01em; margin:0; }
   .city{ font-size: 11.5px; color: var(--ink-2); margin: 1px 0 0; font-weight:600; }
-  .price{ font-size: 14.5px; font-weight:800; white-space:nowrap; font-variant-numeric: tabular-nums; }
+  .price{ font-size: 17px; font-weight:800; white-space:nowrap; font-variant-numeric: tabular-nums; }
 
   .row2{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .facts-inline{ font-size:11.5px; color: var(--ink-2); font-weight:600; display:flex; gap:8px; flex-wrap:wrap;}
   .facts-inline b{ color:var(--ink); font-weight:800; }
   .dot{ opacity:0.4; }
 
+  /* Task: score decongestion. .composite-mini now reads as a small pill
+     (accent tokens, no new color literals) so the composite score is
+     unmistakably the primary ranking signal on the card, rather than a plain
+     number sized the same as everything around it. */
   .row3{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:auto; }
-  .composite-mini{ display:flex; align-items:baseline; gap:3px; flex:none; }
-  .composite-mini .n{ font-size:19px; font-weight:800; font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
+  .composite-mini{
+    display:flex; align-items:baseline; gap:3px; flex:none; background: var(--accent-soft);
+    color: var(--accent); padding: 4px 9px; border-radius: 999px;
+  }
+  .composite-mini .n{ font-size:20px; font-weight:800; font-variant-numeric: tabular-nums; letter-spacing:-0.02em; color: var(--accent); }
   .composite-mini .n.pending{ font-size:11.5px; color: var(--ink-3); font-weight:700; }
-  .composite-mini .l{ font-size:9.5px; color: var(--ink-3); font-weight:700; text-transform:uppercase; }
+  .composite-mini .l{ font-size:9.5px; color: var(--accent); font-weight:700; text-transform:uppercase; opacity:0.85; }
 
-  /* Task 7 addition: position:relative + z-index:2 raises the bars above
-     .card-open-link so the browser's hover hit-test reaches each <i>'s native
-     `title` tooltip (the addendum's required per-bar tooltip) instead of the
-     stretched card-open-link overlay swallowing the hover. This makes the bars
-     themselves a small non-navigating dead zone within the card, which is
-     acceptable since the tooltip is the point of this element. */
-  .mini-eq{ display:flex; align-items:flex-end; gap:2.5px; height:22px; flex:none; position:relative; z-index:2; }
-  .mini-eq i{ display:block; width:5px; border-radius:1.5px 1.5px 0 0; background: var(--accent); }
-  .mini-eq i.na{ background: var(--track); }
+  /* Replaces the removed .mini-eq 6-bar graph: only the two factors the
+     owner said matter on a card (commute, outdoor) are surfaced here. */
+  .mini-stats{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .mini-stat{ display:flex; align-items:baseline; gap:3px; flex:none; }
+  .mini-stat .n{ font-size:13px; font-weight:800; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .mini-stat .l{ font-size:9.5px; color: var(--ink-3); font-weight:700; text-transform:uppercase; letter-spacing:0.02em; }
 
   .value-mini{ font-size:11px; font-weight:700; color: var(--amber); background: var(--amber-soft); padding:3px 7px; border-radius: 999px; flex:none; }
 
@@ -170,13 +173,19 @@
   .b-pill.garage{ border:1px solid var(--line); color: var(--ink-2); background:none; text-transform:none; font-weight:700; }
   .b-pill.est{ border:1px solid var(--line); color: var(--ink-3); background:none; text-transform:none; font-weight:700; }
 
-  /* position:relative + z-index:2 (Task 7 addition) raises .row4 above
-     .card-open-link so .compass-link inside it stays independently clickable
-     instead of being swallowed by the stretched card overlay. */
-  .row4{ display:flex; justify-content:flex-end; position:relative; z-index:2; }
+  /* Task 7 addition, now applied directly to .compass-link (previously to a
+     wrapping .row4): position:relative + z-index:2 raises it above
+     .card-open-link so it stays independently clickable instead of being
+     swallowed by the stretched card overlay. .row4 was removed -- the
+     Compass button now sits at the end of .row3 (via margin-left:auto)
+     instead of alone on its own row, so desktop cards read as fewer, denser
+     rows and mobile cards don't leave an empty-looking full-width row under
+     the stats (the owner's "Compass button sits alone on a wide row"
+     feedback). */
   .compass-link{
     display:inline-flex; align-items:center; gap:5px; flex:none; font-size: 11.5px; font-weight:800; color: var(--accent);
     padding: 6px 11px; border-radius: 999px; border: 1px solid var(--accent); text-decoration:none;
+    margin-left:auto; position:relative; z-index:2;
   }
   .compass-link:hover{ background: var(--accent-soft); }
   .compass-link svg{ width:11px; height:11px; }
@@ -184,9 +193,15 @@
   footer.app-footer{ max-width:900px; margin: 0 auto; padding: 30px 20px 50px; color: var(--ink-3); font-size: 12px; text-align:center; }
 
   @media (max-width: 560px){
-    .thumb-wrap{ width:80px; }
+    .thumb-wrap{ width:96px; }
     .addr{ font-size:13.5px; }
-    .row3{ gap:8px; }
+    .price{ font-size:15.5px; }
+    .row3{ gap:8px; row-gap:10px; }
+    .mini-stats{ gap:8px; }
+    /* Tap target: the pill was ~28px tall on desktop, well under the 44px
+       minimum this task calls for on mobile. min-height (rather than a fixed
+       height) lets the pill still grow for larger text-size settings. */
+    .compass-link{ min-height:44px; padding:0 16px; }
   }
 
   /* ---------- detail view (shared language, same as calm variant) ---------- */
@@ -266,6 +281,10 @@
   .eq-bar .val{ font-size:11px; font-weight:800; margin-top:6px; font-variant-numeric: tabular-nums; }
   .eq-bar .val.na{ color: var(--ink-3); }
   .eq-bar .lbl{ font-size: 9.5px; font-weight:700; color: var(--ink-3); text-transform:uppercase; letter-spacing:0.03em; margin-top:2px; }
+  /* Real commute time under the commute factor's label -- the score alone
+     ("88") does not answer "how far is it?". Only rendered when the listing
+     has commute data; 17 of 85 failed geocoding. */
+  .eq-bar .sub-stat{ font-size:10px; font-weight:800; color: var(--ink-2); margin-top:1px; font-variant-numeric: tabular-nums; }
   .eq-bar .wt{ font-size: 9px; color: var(--ink-3); opacity:0.7; }
 
   .fact-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
