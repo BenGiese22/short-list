@@ -293,6 +293,23 @@
   .fact-card .k svg{ width:12px; height:12px; }
   .fact-card .v{ font-size:14px; font-weight:800; margin-top:5px; }
   .fact-card .v.warn{ color: var(--warn); }
+  /* HOA split button: a known fee is shown per-year or per-month. Sized to sit
+     inside a fact card without changing its rhythm, and built from the existing
+     tokens so both themes keep working. */
+  .hoa-figure{ display:flex; align-items:baseline; gap:3px; font-variant-numeric: tabular-nums; }
+  .hoa-figure .hoa-basis{ font-size:11px; font-weight:700; color: var(--ink-3); }
+  .hoa-toggle{ display:inline-flex; margin-top:8px; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .hoa-toggle button{
+    appearance:none; background:none; border:0; cursor:pointer; font:inherit;
+    font-size:10.5px; font-weight:800; letter-spacing:0.02em; color: var(--ink-3);
+    padding:5px 11px; min-height:30px;
+  }
+  .hoa-toggle button:hover{ color: var(--ink-2); }
+  .hoa-toggle button.active{ background: var(--accent-soft); color: var(--accent); }
+  @media (max-width: 560px){
+    /* 44px tap targets on mobile, same rule as .compass-link. */
+    .hoa-toggle button{ min-height:44px; padding:0 16px; }
+  }
   .fact-card .v.muted{ color: var(--ink-3); font-weight:700; }
   .fact-card .sub{ font-size:11.5px; color: var(--ink-2); margin-top:3px; font-weight:600; }
 

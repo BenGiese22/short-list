@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import type { Row } from '@libsql/client'
 import { getListing } from '@/lib/queries'
 import { Gallery } from './Gallery'
+import { HoaFigure } from './HoaFigure'
 
 // getListing() returns the spread of a libsql `Row` (a `[name: string]: Value`
 // index-signature object) plus `amenities`/`photos`. TypeScript's inference of
@@ -42,12 +43,14 @@ function fmtWeight(weight: number): string {
  *  never disclosed (which scores a neutral 50), 0 means a confirmed absence of
  *  HOA, and a positive value is the annualized fee in dollars. Keying off the
  *  score would conflate "unknown" with "cheap". */
-function hoaFact(hoaAnnual: number | null): { text: string; cls: string } {
+function hoaFact(hoaAnnual: number | null): { text: string; cls: string } | null {
   if (hoaAnnual === null || hoaAnnual === undefined) {
     return { text: 'Not disclosed', cls: 'muted' }
   }
   if (hoaAnnual <= 0) return { text: 'None', cls: '' }
-  return { text: `$${Math.round(hoaAnnual).toLocaleString()}/yr`, cls: 'warn' }
+  // A real fee is worth showing per-year and per-month, which needs state --
+  // null here routes the card to the HoaFigure client component instead.
+  return null
 }
 const EQ_KEYS = Object.keys(WEIGHTS)
 
@@ -127,7 +130,8 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
   const garageAttached = l.garage_attached as number | null
   // 68 of 85 listings have commute minutes; the rest failed geocoding.
   const denverMinutes = l.denver_minutes as number | null
-  const hoa = hoaFact(l.hoa_annual as number | null)
+  const hoaAnnual = l.hoa_annual as number | null
+  const hoa = hoaFact(hoaAnnual)
   // 78 of 85 listings have an empty description upstream in the scraper, so
   // render nothing at all rather than a heading over blank space.
   const description = ((l.description as string | null) ?? '').trim() || null
@@ -270,7 +274,11 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
           </div>
           <div className="fact-card">
             <div className="k">HOA</div>
-            <div className={`v ${hoa.cls}`}>{hoa.text}</div>
+            {hoa ? (
+              <div className={`v ${hoa.cls}`}>{hoa.text}</div>
+            ) : (
+              <HoaFigure hoaAnnual={hoaAnnual as number} />
+            )}
           </div>
           <div className="fact-card">
             <div className="k">Staging</div>
