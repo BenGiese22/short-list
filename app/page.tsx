@@ -107,6 +107,14 @@ function ListingCard({ listing: l }: { listing: Row }) {
   // the exceptions. NULL (pre-backfill, or a source gap) also renders nothing,
   // which is the right answer for "unknown" too.
   const hoaAnnual = l.hoa_annual as number | null
+  // Same derivation and the same both-inputs-known rule as the cost sort's
+  // ORDER BY, so the number shown on a card always matches the order it sorts
+  // into. Arrives via l.* -- no column named in the card query.
+  const taxAnnual = l.tax_annual as number | null
+  const monthlyCost =
+    taxAnnual !== null && taxAnnual !== undefined && hoaAnnual !== null && hoaAnnual !== undefined
+      ? (taxAnnual + hoaAnnual) / 12
+      : null
 
   const value =
     composite !== null && priceNumeric !== null && priceNumeric > 0
@@ -175,6 +183,12 @@ function ListingCard({ listing: l }: { listing: Row }) {
               <span className="mini-stat">
                 <span className="n">{Math.round(outdoor)}</span>
                 <span className="l">outdoor</span>
+              </span>
+            ) : null}
+            {monthlyCost !== null ? (
+              <span className="mini-stat">
+                <span className="n">${Math.round(monthlyCost).toLocaleString()}</span>
+                <span className="l">/mo cost</span>
               </span>
             ) : null}
           </div>

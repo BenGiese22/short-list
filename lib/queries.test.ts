@@ -167,7 +167,7 @@ describe('post-migration, pre-backfill mirror (new columns exist, all NULL)', ()
   // So "columns exist, every value NULL" is a real state the site serves, not a
   // hypothetical -- and no query may break in it.
   it('returns such listings with NULLs, and every sort still works', async () => {
-    for (const sort of [undefined, 'composite', 'value', 'price'] as const) {
+    for (const sort of [undefined, 'composite', 'value', 'price', 'cost'] as const) {
       const { sql, args } = buildListingsQuery(sort ? { sort: sort as SortKey } : {})
       const result = await db.execute({ sql, args })
       const b = result.rows.find((r) => r.listing_id === 'b')!
@@ -190,5 +190,45 @@ describe('post-migration, pre-backfill mirror (new columns exist, all NULL)', ()
     expect(a.tax_annual).toBe(3160)
     expect(a.sqft_above_grade).toBe(1404)
     expect(a.sqft_below_grade).toBe(360)
+  })
+})
+
+describe('cost sort', () => {
+  let db: Client
+
+  beforeEach(async () => {
+    db = createClient({ url: ':memory:' })
+    await seed(db)
+  })
+
+  it('orders by derived monthly carrying cost, cheapest first', async () => {
+    // 'a' has tax 3160 and hoa 0 -> 263.33/mo. 'b' has neither, so it has no
+    // computable cost and must fall to the end rather than sorting as free.
+    const { sql, args } = buildListingsQuery({ sort: 'cost' })
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id)).toEqual(['a', 'b'])
+  })
+
+  it('treats an unknown HOA as unknown, not as zero', async () => {
+    // The whole reason the ORDER BY guards on both columns. A listing with a
+    // known tax but NULL hoa_annual must NOT sort as though its HOA were $0 --
+    // that would rank it cheaper than a listing whose fee is merely disclosed.
+    await db.execute(
+      "INSERT INTO listings (listing_id, address, city, state, price_numeric, listing_url, tax_annual, hoa_annual) " +
+        "VALUES ('c', '3 Elm', 'Arvada', 'CO', 400000, 'https://compass.com/c', 120, NULL)"
+    )
+    const { sql, args } = buildListingsQuery({ sort: 'cost' })
+    const result = await db.execute({ sql, args })
+    const ids = result.rows.map((r) => r.listing_id)
+    // 'c' would be the cheapest at $10/mo if NULL were coalesced to 0; instead
+    // it has no computable cost and joins 'b' at the end.
+    expect(ids[0]).toBe('a')
+    expect(ids.slice(1)).toContain('c')
+  })
+
+  it('never reaches SORT_COLUMNS, so the prototype-safe fallback is untouched', async () => {
+    const { sql } = buildListingsQuery({ sort: 'cost' })
+    expect(sql).toContain('tax_annual')
+    expect(sql).not.toContain('s.composite DESC')
   })
 })
