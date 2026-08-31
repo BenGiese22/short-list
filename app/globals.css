@@ -250,6 +250,9 @@
   .detail-head{ padding: 20px 20px 0; }
   .detail-head h2{ font-size: 26px; font-weight: 800; letter-spacing:-0.02em; margin: 0 0 2px; }
   .detail-head .sub{ font-size: 14px; color: var(--ink-2); font-weight:600; margin:0; }
+  /* The monthly carrying cost, directly under the price it qualifies. Kept
+     deliberately small: it is a qualifier, not a second headline. */
+  .cost-line{ margin: 3px 0 0; font-size: 12px; font-weight:700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
   .detail-price{ font-size: 20px; font-weight:800; margin-top:10px; font-variant-numeric: tabular-nums; }
 
   .stat-strip{ display:flex; gap:0; margin: 16px 20px 0; border:1px solid var(--line); border-radius: var(--radius-m); overflow:hidden; }
