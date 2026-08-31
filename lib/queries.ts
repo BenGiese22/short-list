@@ -102,7 +102,7 @@ export async function getListing(id: string) {
   const listing = await db.execute({
     sql: `
       SELECT l.*, s.commute_score, s.sqft_score, s.condition_score, s.outdoor_score,
-             s.room_count_score, s.parking_score, s.composite, s.passes_filters,
+             s.room_count_score, s.parking_score, s.hoa_score, s.composite, s.passes_filters,
              s.has_incomplete_data,
              vs.garage_attached, vs.watermarked_staging_detected,
              vs.suspected_unwatermarked_staging, vs.staging_notes,

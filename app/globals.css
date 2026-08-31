@@ -273,7 +273,11 @@
   .value-chip .l{ font-size:11px; font-weight:700; }
   .value-note{ font-size:11px; color: var(--ink-3); margin-top:6px; }
 
-  .eq{ display:flex; gap: 14px; align-items:flex-end; height: 90px; margin-top: 4px; }
+  /* Height raised a little from the mockup's 90px: the single-line sub-stat
+     slot (commute minutes, HOA annual fee) is reserved in every column, and at
+     90px it ate into the bars until they were too squat to compare -- which is
+     the one job this chart has. */
+  .eq{ display:flex; gap: 14px; align-items:flex-end; height: 112px; margin-top: 4px; }
   .eq-bar{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
   .eq-bar .bar-track{ flex:1; width:100%; max-width:26px; display:flex; align-items:flex-end; }
   .eq-bar .bar{ width:100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height:3px; }
@@ -284,7 +288,10 @@
   /* Real commute time under the commute factor's label -- the score alone
      ("88") does not answer "how far is it?". Only rendered when the listing
      has commute data; 17 of 85 failed geocoding. */
-  .eq-bar .sub-stat{ font-size:10px; font-weight:800; color: var(--ink-2); margin-top:1px; font-variant-numeric: tabular-nums; }
+  /* One fixed line in every column -- commute shows minutes, HOA shows the
+     annual fee, the rest render a non-breaking space. Always the same height,
+     so no column can lift its bar off the shared baseline. */
+  .eq-bar .sub-stat{ font-size:10px; font-weight:800; color: var(--ink-2); margin-top:1px; font-variant-numeric: tabular-nums; white-space:nowrap; }
   .eq-bar .wt{ font-size: 9px; color: var(--ink-3); opacity:0.7; }
 
   .fact-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
@@ -293,6 +300,25 @@
   .fact-card .k svg{ width:12px; height:12px; }
   .fact-card .v{ font-size:14px; font-weight:800; margin-top:5px; }
   .fact-card .v.warn{ color: var(--warn); }
+  /* HOA split button: a known fee is shown per-year or per-month. Sized to sit
+     inside a fact card without changing its rhythm, and built from the existing
+     tokens so both themes keep working. */
+  .fact-card .v.hoa-v{ font-variant-numeric: tabular-nums; font-size:13px; }
+  @media (max-width: 560px){
+    /* The HOA factor made this a seven-column chart, which overflowed a
+       ~390px viewport at the desktop gap and type scale -- the last bar was
+       clipped off the right edge. These MUST live in this later media block:
+       an earlier one loses to the plain `.eq` rule above on source order at
+       equal specificity, which is why an identical set higher up silently did
+       nothing. Tightened rather than made scrollable -- a chart you have to
+       scroll cannot be compared at a glance, which is its only purpose. */
+    .eq{ gap:4px; }
+    .eq-bar .lbl{ font-size:7.5px; letter-spacing:0; }
+    .eq-bar .val{ font-size:10px; }
+    .eq-bar .sub-stat{ font-size:8px; }
+    .eq-bar .wt{ font-size:8px; }
+    /* 44px tap targets on mobile, same rule as .compass-link. */
+  }
   .fact-card .v.muted{ color: var(--ink-3); font-weight:700; }
   .fact-card .sub{ font-size:11.5px; color: var(--ink-2); margin-top:3px; font-weight:600; }
 

@@ -13,16 +13,56 @@ import { Gallery } from './Gallery'
 // (Task 7) types its own row prop.
 type Listing = Row & { amenities: string[]; photos: { position: number; url: string }[] }
 
+// Mirrors home-search's src/scoring.py rubric. HOA scoring (merged there as
+// da34c14) added a seventh factor at 4.5% and rescaled the original six by
+// 0.955 to make room; these seven sum to 100. This duplication is a known
+// hazard -- a reviewer predicted this exact desync before it happened -- so
+// if scoring.py's weights move again, they must be changed here too.
 const WEIGHTS: Record<string, number> = {
-  commute: 30, sqft: 20, condition: 20, outdoor: 15, room: 10, parking: 5,
+  commute: 28.65, sqft: 19.1, condition: 19.1, outdoor: 14.325,
+  room: 9.55, parking: 4.775, hoa: 4.5,
 }
 const LABELS: Record<string, string> = {
   commute: 'Commute', sqft: 'Sqft', condition: 'Condition', outdoor: 'Outdoor',
-  room: 'Rooms', parking: 'Parking',
+  room: 'Rooms', parking: 'Parking', hoa: 'HOA',
 }
 const SCORE_FIELD: Record<string, string> = {
   commute: 'commute_score', sqft: 'sqft_score', condition: 'condition_score',
   outdoor: 'outdoor_score', room: 'room_count_score', parking: 'parking_score',
+  hoa: 'hoa_score',
+}
+
+/** 28.65 -> "28.7", 4.5 -> "4.5", 19.1 -> "19.1". Rescaled weights are no
+ *  longer whole numbers, and rounding them to integers would misreport them. */
+function fmtWeight(weight: number): string {
+  return (Math.round(weight * 10) / 10).toString()
+}
+
+/** HOA display is driven off hoa_annual, not hoa_score: NULL means the fee was
+ *  never disclosed (which scores a neutral 50), 0 means a confirmed absence of
+ *  HOA, and a positive value is the annualized fee in dollars. Keying off the
+ *  score would conflate "unknown" with "cheap". */
+/** Whole dollars for the annual figure; the monthly one keeps cents when the
+ *  division is not clean, so $3,050/yr reads as $254.17/mo rather than a $254
+ *  that quietly loses two dollars a year. */
+function fmtMoney(amount: number): string {
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function hoaFact(hoaAnnual: number | null): { text: string; cls: string } {
+  if (hoaAnnual === null || hoaAnnual === undefined) {
+    return { text: 'Not disclosed', cls: 'muted' }
+  }
+  if (hoaAnnual <= 0) return { text: 'None', cls: '' }
+  // Both figures rather than a toggle: they fit side by side, so hiding one
+  // behind a click bought nothing.
+  return {
+    text: `${fmtMoney(Math.round(hoaAnnual))}/yr · ${fmtMoney(hoaAnnual / 12)}/mo`,
+    cls: 'warn',
+  }
 }
 const EQ_KEYS = Object.keys(WEIGHTS)
 
@@ -102,6 +142,8 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
   const garageAttached = l.garage_attached as number | null
   // 68 of 85 listings have commute minutes; the rest failed geocoding.
   const denverMinutes = l.denver_minutes as number | null
+  const hoaAnnual = l.hoa_annual as number | null
+  const hoa = hoaFact(hoaAnnual)
   // 78 of 85 listings have an empty description upstream in the scraper, so
   // render nothing at all rather than a heading over blank space.
   const description = ((l.description as string | null) ?? '').trim() || null
@@ -217,6 +259,13 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
             // score still cannot escape its track.
             const pct = na ? 0 : Math.round(Math.min(100, Math.max(0, raw)) * 10) / 10
             const commuteMins = key === 'commute' ? denverMinutes : null
+            // Same treatment as the commute minutes: the sub-score alone ("50")
+            // never said what the fee actually is. Annual only, kept to one
+            // line -- the facts card carries the monthly figure alongside it.
+            const hoaSub =
+              key === 'hoa' && hoaAnnual !== null && hoaAnnual > 0
+                ? `${fmtMoney(Math.round(hoaAnnual))}/yr`
+                : null
             return (
               <div key={key} className="eq-bar">
                 <div className="bar-track">
@@ -224,10 +273,16 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
                 </div>
                 <div className={`val${na ? ' na' : ''}`}>{raw === null || raw === undefined ? '—' : Math.round(raw)}</div>
                 <div className="lbl">{LABELS[key]}</div>
-                {commuteMins !== null ? (
-                  <div className="sub-stat">{Math.round(commuteMins)} mins</div>
-                ) : null}
-                <div className="wt">{WEIGHTS[key]}%</div>
+                {/* Rendered in EVERY column, empty where there is nothing to
+                    say. Only the commute factor has a sub-stat, and omitting
+                    the element elsewhere made that column one line taller than
+                    its neighbours -- which, with the row bottom-aligned, lifted
+                    the commute bar off the shared baseline and made the bar
+                    heights uncomparable. */}
+                <div className="sub-stat">
+                  {commuteMins !== null ? `${Math.round(commuteMins)} mins` : hoaSub ?? '\u00a0'}
+                </div>
+                <div className="wt">{fmtWeight(WEIGHTS[key])}%</div>
               </div>
             )
           })}
@@ -241,6 +296,10 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
             <div className="k">Garage</div>
             <div className={`v ${garage.cls}`}>{garage.text}</div>
             {garageAttached === 0 ? <div className="sub">Detached from the house</div> : null}
+          </div>
+          <div className="fact-card">
+            <div className="k">HOA</div>
+            <div className={`v ${hoa.cls} hoa-v`}>{hoa.text}</div>
           </div>
           <div className="fact-card">
             <div className="k">Staging</div>
