@@ -171,6 +171,10 @@
   .b-pill.cutoff{ background: var(--amber); color:#fff; }
   .b-pill.pending{ background: hsl(220 8% 40% / 0.16); color: var(--ink-2); }
   .b-pill.garage{ border:1px solid var(--line); color: var(--ink-2); background:none; text-transform:none; font-weight:700; }
+  /* A real HOA fee is the exception on this corpus (9 of 85), so it reads as a
+     flag rather than a neutral fact -- amber, matching the value chip's
+     "worth noticing" tone rather than the red reserved for staging warnings. */
+  .b-pill.hoa{ border:1px solid var(--amber); color: var(--amber); background: var(--amber-soft); text-transform:none; font-weight:800; }
   .b-pill.est{ border:1px solid var(--line); color: var(--ink-3); background:none; text-transform:none; font-weight:700; }
 
   /* Task 7 addition, now applied directly to .compass-link (previously to a
