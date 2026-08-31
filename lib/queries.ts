@@ -4,7 +4,7 @@ import { getDb } from './db'
 
 export type SortKey =
   | 'composite' | 'commute' | 'sqft' | 'condition' | 'outdoor' | 'room' | 'parking'
-  | 'value' | 'price'
+  | 'value' | 'price' | 'cost'
 
 // A Map (rather than a plain object) so an unrecognized or prototype-polluting
 // key (e.g. '__proto__', 'toString') safely misses instead of resolving to an
@@ -52,6 +52,19 @@ export function buildListingsQuery(filter: ListingsFilter): { sql: string; args:
     orderBy = "ORDER BY (CASE WHEN l.price_numeric > 0 THEN s.composite / (l.price_numeric / 100000.0) END) DESC NULLS LAST"
   } else if (filter.sort === 'price') {
     orderBy = 'ORDER BY l.price_numeric ASC NULLS LAST'
+  } else if (filter.sort === 'cost') {
+    // Derived, because upstream deliberately did not mirror Compass's
+    // precomputed monthlySalesChargesInclTaxes. Both inputs must be non-NULL:
+    // a NULL hoa_annual means UNKNOWN, not zero, so coalescing it would sort a
+    // listing as cheaper than it may actually be. Listings missing either fall
+    // to the end via NULLS LAST rather than sorting as free.
+    //
+    // This is the ONLY place a post-migration column is named in SQL, and it
+    // appears only when this sort is selected -- the default query still names
+    // none of them, so the list page survives an unmigrated mirror.
+    orderBy =
+      'ORDER BY (CASE WHEN l.tax_annual IS NOT NULL AND l.hoa_annual IS NOT NULL ' +
+      'THEN (l.tax_annual + l.hoa_annual) / 12.0 END) ASC NULLS LAST'
   } else {
     // filter.sort may come from an unvalidated searchParams string (the list
     // view reads it straight off the URL), so an unrecognized value must fall

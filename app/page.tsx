@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Row } from '@libsql/client'
 import { getListings, type SortKey } from '@/lib/queries'
+import { fmtMoney } from '@/lib/facts'
 import { ListControls } from './ListControls'
 
 export default function HomePage({
@@ -101,6 +102,19 @@ function ListingCard({ listing: l }: { listing: Row }) {
   // rest), so this must render nothing rather than "null min".
   const commuteMinutes = l.denver_minutes as number | null
   const outdoor = l.outdoor_score as number | null
+  // Only a real fee earns a pill. Post-backfill ~88% of listings are a definite
+  // "None", so printing that on 75 of 85 cards would be noise -- the pill marks
+  // the exceptions. NULL (pre-backfill, or a source gap) also renders nothing,
+  // which is the right answer for "unknown" too.
+  const hoaAnnual = l.hoa_annual as number | null
+  // Same derivation and the same both-inputs-known rule as the cost sort's
+  // ORDER BY, so the number shown on a card always matches the order it sorts
+  // into. Arrives via l.* -- no column named in the card query.
+  const taxAnnual = l.tax_annual as number | null
+  const monthlyCost =
+    taxAnnual !== null && taxAnnual !== undefined && hoaAnnual !== null && hoaAnnual !== undefined
+      ? (taxAnnual + hoaAnnual) / 12
+      : null
 
   const value =
     composite !== null && priceNumeric !== null && priceNumeric > 0
@@ -146,6 +160,9 @@ function ListingCard({ listing: l }: { listing: Row }) {
             {garageAttached === 0 ? <span className="b-pill garage">Detached garage</span> : null}
             {garageAttached === 1 ? <span className="b-pill garage">Attached garage</span> : null}
             {hasIncompleteData ? <span className="b-pill est">Est. data</span> : null}
+            {hoaAnnual !== null && hoaAnnual !== undefined && hoaAnnual > 0 ? (
+              <span className="b-pill hoa">{fmtMoney(hoaAnnual / 12)}/mo HOA</span>
+            ) : null}
           </div>
         </div>
 
@@ -166,6 +183,12 @@ function ListingCard({ listing: l }: { listing: Row }) {
               <span className="mini-stat">
                 <span className="n">{Math.round(outdoor)}</span>
                 <span className="l">outdoor</span>
+              </span>
+            ) : null}
+            {monthlyCost !== null ? (
+              <span className="mini-stat">
+                <span className="n">${Math.round(monthlyCost).toLocaleString()}</span>
+                <span className="l">/mo cost</span>
               </span>
             ) : null}
           </div>

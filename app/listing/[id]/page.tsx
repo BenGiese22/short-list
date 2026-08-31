@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import type { Row } from '@libsql/client'
 import { getListing } from '@/lib/queries'
 import { Gallery } from './Gallery'
+import { basementFact, fmtMoney, monthlyCostLine, propertyTaxFact } from '@/lib/facts'
 
 // getListing() returns the spread of a libsql `Row` (a `[name: string]: Value`
 // index-signature object) plus `amenities`/`photos`. TypeScript's inference of
@@ -42,16 +43,6 @@ function fmtWeight(weight: number): string {
  *  never disclosed (which scores a neutral 50), 0 means a confirmed absence of
  *  HOA, and a positive value is the annualized fee in dollars. Keying off the
  *  score would conflate "unknown" with "cheap". */
-/** Whole dollars for the annual figure; the monthly one keeps cents when the
- *  division is not clean, so $3,050/yr reads as $254.17/mo rather than a $254
- *  that quietly loses two dollars a year. */
-function fmtMoney(amount: number): string {
-  return `$${amount.toLocaleString(undefined, {
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
 function hoaFact(hoaAnnual: number | null): { text: string; cls: string } {
   if (hoaAnnual === null || hoaAnnual === undefined) {
     return { text: 'Not disclosed', cls: 'muted' }
@@ -144,6 +135,21 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
   const denverMinutes = l.denver_minutes as number | null
   const hoaAnnual = l.hoa_annual as number | null
   const hoa = hoaFact(hoaAnnual)
+  const taxAnnual = l.tax_annual as number | null
+  const tax = propertyTaxFact(taxAnnual)
+  const basement = basementFact(
+    l.sqft as number | null,
+    l.sqft_above_grade as number | null,
+    l.sqft_below_grade as number | null,
+  )
+  // Upstream deliberately did not mirror Compass's precomputed
+  // monthlySalesChargesInclTaxes, so this is derived. Both inputs must be known:
+  // a NULL hoa_annual means UNKNOWN, not zero, and quietly coalescing it to 0
+  // would understate the cost while still labelling the line "taxes & HOA".
+  const carrying =
+    taxAnnual !== null && taxAnnual !== undefined && hoaAnnual !== null && hoaAnnual !== undefined
+      ? monthlyCostLine(taxAnnual / 12 + hoaAnnual / 12)
+      : null
   // 78 of 85 listings have an empty description upstream in the scraper, so
   // render nothing at all rather than a heading over blank space.
   const description = ((l.description as string | null) ?? '').trim() || null
@@ -207,6 +213,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
         <div className="detail-price">
           {priceNumeric !== null ? `$${priceNumeric.toLocaleString()}` : priceText ?? '—'}
         </div>
+        {carrying ? <p className="cost-line">{carrying}</p> : null}
       </div>
 
       <div className="stat-strip">
@@ -232,7 +239,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
               <div className="composite-num">{Math.round(composite)}</div>
               <div className="composite-meta">
                 <div className="gauge"><i style={{ width: `${composite}%` }} /></div>
-                <p className="composite-caption">Composite score, weighted across the six factors below.</p>
+                <p className="composite-caption">Composite score, weighted across the seven factors below.</p>
               </div>
             </div>
             {value !== null ? (
@@ -300,6 +307,15 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
           <div className="fact-card">
             <div className="k">HOA</div>
             <div className={`v ${hoa.cls} hoa-v`}>{hoa.text}</div>
+          </div>
+          <div className="fact-card">
+            <div className="k">Property tax</div>
+            <div className={`v ${tax.cls} hoa-v`}>{tax.text}</div>
+          </div>
+          <div className="fact-card">
+            <div className="k">Basement</div>
+            <div className={`v ${basement.cls}`}>{basement.text}</div>
+            {basement.sub ? <div className="sub">{basement.sub}</div> : null}
           </div>
           <div className="fact-card">
             <div className="k">Staging</div>

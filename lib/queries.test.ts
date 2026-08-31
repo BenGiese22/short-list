@@ -7,7 +7,9 @@ async function seed(db: Client) {
     listing_id TEXT PRIMARY KEY, address TEXT, city TEXT, state TEXT, zip_code TEXT,
     price TEXT, price_numeric REAL, beds INTEGER, baths REAL, sqft INTEGER,
     lot_sqft INTEGER, parking_spaces INTEGER, year_built INTEGER, description TEXT,
-    listing_url TEXT, is_pinned INTEGER, hoa_annual REAL
+    listing_url TEXT, is_pinned INTEGER, hoa_annual REAL,
+    tax_annual REAL, sqft_above_grade INTEGER, sqft_below_grade INTEGER,
+    outdoor_spaces TEXT
   )`)
   await db.execute(`CREATE TABLE scores (
     listing_id TEXT PRIMARY KEY, commute_score REAL, sqft_score REAL,
@@ -31,13 +33,13 @@ async function seed(db: Client) {
   )`)
 
   await db.execute(
-    "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0, 0)"
+    "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0, 0, 3160, 1404, 360, '[\"Deck\",\"Patio\"]')"
   )
   await db.execute(
     "INSERT INTO scores VALUES ('a', 80, 70, 90, 60, 75, 100, 52.5, 79, 1, 0, 't')"
   )
   await db.execute(
-    "INSERT INTO listings VALUES ('b', '2 Oak Ave', 'Broomfield', 'CO', '80020', '$500,000', 500000, 3, 2, 1500, 6500, 1, 1990, 'desc', 'https://compass.com/b', 0, NULL)"
+    "INSERT INTO listings VALUES ('b', '2 Oak Ave', 'Broomfield', 'CO', '80020', '$500,000', 500000, 3, 2, 1500, 6500, 1, 1990, 'desc', 'https://compass.com/b', 0, NULL, NULL, NULL, NULL, NULL)"
   )
   await db.execute(
     "INSERT INTO scores VALUES ('b', 60, 50, 40, 90, 50, 90, 50, 55, 0, 1, 't')"
@@ -149,5 +151,84 @@ describe('HOA', () => {
     const result = await db.execute({ sql, args })
     const b = result.rows.find((r) => r.listing_id === 'b')!
     expect(b.hoa_annual).toBeNull()
+  })
+})
+
+describe('post-migration, pre-backfill mirror (new columns exist, all NULL)', () => {
+  let db: Client
+
+  beforeEach(async () => {
+    db = createClient({ url: ':memory:' })
+    await seed(db)
+  })
+
+  // This UI reads a Turso mirror that only changes when home-search/publish.py
+  // runs, and ensure_schema() ALTERs new columns in before any backfill lands.
+  // So "columns exist, every value NULL" is a real state the site serves, not a
+  // hypothetical -- and no query may break in it.
+  it('returns such listings with NULLs, and every sort still works', async () => {
+    for (const sort of [undefined, 'composite', 'value', 'price', 'cost'] as const) {
+      const { sql, args } = buildListingsQuery(sort ? { sort: sort as SortKey } : {})
+      const result = await db.execute({ sql, args })
+      const b = result.rows.find((r) => r.listing_id === 'b')!
+      expect(b.tax_annual).toBeNull()
+      expect(b.sqft_above_grade).toBeNull()
+      expect(b.sqft_below_grade).toBeNull()
+      expect(b.outdoor_spaces).toBeNull()
+    }
+  })
+
+  it('surfaces the new columns on a populated listing without naming them in SQL', async () => {
+    // buildListingsQuery selects l.* and never references these columns
+    // explicitly -- which is what keeps the page alive against a mirror that
+    // predates the migration entirely.
+    const { sql, args } = buildListingsQuery({})
+    expect(sql).not.toContain('tax_annual')
+    expect(sql).not.toContain('sqft_above_grade')
+    const result = await db.execute({ sql, args })
+    const a = result.rows.find((r) => r.listing_id === 'a')!
+    expect(a.tax_annual).toBe(3160)
+    expect(a.sqft_above_grade).toBe(1404)
+    expect(a.sqft_below_grade).toBe(360)
+  })
+})
+
+describe('cost sort', () => {
+  let db: Client
+
+  beforeEach(async () => {
+    db = createClient({ url: ':memory:' })
+    await seed(db)
+  })
+
+  it('orders by derived monthly carrying cost, cheapest first', async () => {
+    // 'a' has tax 3160 and hoa 0 -> 263.33/mo. 'b' has neither, so it has no
+    // computable cost and must fall to the end rather than sorting as free.
+    const { sql, args } = buildListingsQuery({ sort: 'cost' })
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id)).toEqual(['a', 'b'])
+  })
+
+  it('treats an unknown HOA as unknown, not as zero', async () => {
+    // The whole reason the ORDER BY guards on both columns. A listing with a
+    // known tax but NULL hoa_annual must NOT sort as though its HOA were $0 --
+    // that would rank it cheaper than a listing whose fee is merely disclosed.
+    await db.execute(
+      "INSERT INTO listings (listing_id, address, city, state, price_numeric, listing_url, tax_annual, hoa_annual) " +
+        "VALUES ('c', '3 Elm', 'Arvada', 'CO', 400000, 'https://compass.com/c', 120, NULL)"
+    )
+    const { sql, args } = buildListingsQuery({ sort: 'cost' })
+    const result = await db.execute({ sql, args })
+    const ids = result.rows.map((r) => r.listing_id)
+    // 'c' would be the cheapest at $10/mo if NULL were coalesced to 0; instead
+    // it has no computable cost and joins 'b' at the end.
+    expect(ids[0]).toBe('a')
+    expect(ids.slice(1)).toContain('c')
+  })
+
+  it('never reaches SORT_COLUMNS, so the prototype-safe fallback is untouched', async () => {
+    const { sql } = buildListingsQuery({ sort: 'cost' })
+    expect(sql).toContain('tax_annual')
+    expect(sql).not.toContain('s.composite DESC')
   })
 })

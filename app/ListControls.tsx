@@ -7,6 +7,7 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: 'composite', label: 'Sort: Composite' },
   { value: 'value', label: 'Sort: Value / $100k' },
   { value: 'price', label: 'Sort: Price (low first)' },
+  { value: 'cost', label: 'Sort: Monthly cost (low first)' },
   { value: 'commute', label: 'Sort: Commute' },
   { value: 'sqft', label: 'Sort: Sqft score' },
   { value: 'condition', label: 'Sort: Condition' },
