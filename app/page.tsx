@@ -5,6 +5,7 @@ import type { Row } from '@libsql/client'
 import { getListings, type SortKey } from '@/lib/queries'
 import { fmtMoney } from '@/lib/facts'
 import { ListControls } from './ListControls'
+import { OwnerTools } from './OwnerTools'
 
 export default function HomePage({
   searchParams,
@@ -23,6 +24,9 @@ export default function HomePage({
           </p>
           <Suspense fallback={<div className="controls" />}>
             <ListControls />
+          </Suspense>
+          <Suspense fallback={null}>
+            <OwnerTools />
           </Suspense>
         </div>
       </header>
