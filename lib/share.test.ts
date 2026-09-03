@@ -102,18 +102,11 @@ describe('share', () => {
   })
 
   describe('resolveShareVisit', () => {
-    it('a valid guest token with no existing cookie sets the cookie for its remaining life', () => {
-      const token = guest(3600)
-      expect(resolveShareVisit({ token, existingCookie: undefined, now: NOW + 1000 })).toEqual({
+    it('a valid guest token with no existing cookie yields the claims to issue', () => {
+      expect(resolveShareVisit({ token: guest(3600), existingCookie: undefined, now: NOW + 1000 })).toEqual({
         kind: 'set',
-        value: token,
-        maxAge: 2600,
+        claims: { role: 'guest', expiresAt: NOW + 3600, keyVersion: '1' },
       })
-    })
-
-    it('maxAge is never below 1 second for a token that is still valid', () => {
-      const token = guest(1)
-      expect(resolveShareVisit({ token, existingCookie: undefined, now: NOW })).toEqual({ kind: 'set', value: token, maxAge: 1 })
     })
 
     it('a visitor who already holds a valid owner cookie is not downgraded', () => {
@@ -121,8 +114,10 @@ describe('share', () => {
     })
 
     it('a visitor holding a guest cookie gets the new link applied (may extend or shorten)', () => {
-      const longer = guest(7200)
-      expect(resolveShareVisit({ token: longer, existingCookie: guest(60), now: NOW })).toEqual({ kind: 'set', value: longer, maxAge: 7200 })
+      expect(resolveShareVisit({ token: guest(7200), existingCookie: guest(60), now: NOW })).toEqual({
+        kind: 'set',
+        claims: { role: 'guest', expiresAt: NOW + 7200, keyVersion: '1' },
+      })
     })
 
     it('an expired or invalid existing owner cookie does not protect the visitor from a bad link', () => {

@@ -3,7 +3,7 @@ import { timingSafeEqual, createHmac } from 'node:crypto'
 import {
   signSession,
   verifySession,
-  remainingSeconds,
+  issueSession,
   currentKeyVersion,
   OWNER_SESSION_SECONDS,
   safeNext,
@@ -70,11 +70,17 @@ describe('session claims', () => {
     expect(verifySession(token, NOW + 61)).toBeNull()
   })
 
-  it('remainingSeconds counts down to zero and never goes negative', () => {
-    const claims = verifySession(signSession({ role: 'guest', expiresAt: NOW + 60 }), NOW)!
-    expect(remainingSeconds(claims, NOW)).toBe(60)
-    expect(remainingSeconds(claims, NOW + 45)).toBe(15)
-    expect(remainingSeconds(claims, NOW + 999)).toBe(0)
+  it('issueSession derives maxAge from the claims it signs', () => {
+    const session = issueSession({ role: 'guest', expiresAt: NOW + 60 }, NOW)
+    expect(session.name).toBe('short_list_session')
+    expect(verifySession(session.value, NOW)).toEqual({ role: 'guest', expiresAt: NOW + 60, keyVersion: '1' })
+    expect(session.options).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 })
+  })
+
+  it('issueSession floors maxAge at 1 second when the clock has moved past the expiry', () => {
+    // `now` is re-read at issue time, so a token with a second left must not
+    // round down to a 0 (session-length) or negative maxAge.
+    expect(issueSession({ role: 'guest', expiresAt: NOW + 1 }, NOW + 5).options.maxAge).toBe(1)
   })
 
   it('signSession rejects a non-integer or past-looking expiry', () => {

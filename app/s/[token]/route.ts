@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { SESSION_COOKIE } from '@/lib/auth'
+import { SESSION_COOKIE, issueSession } from '@/lib/auth'
 import { resolveShareVisit } from '@/lib/share'
 
 export async function GET(
@@ -19,13 +19,8 @@ export async function GET(
   response.headers.set('Cache-Control', 'no-store')
 
   if (visit.kind === 'set') {
-    response.cookies.set(SESSION_COOKIE, visit.value, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: visit.maxAge,
-      path: '/',
-    })
+    const session = issueSession(visit.claims)
+    response.cookies.set(session.name, session.value, session.options)
   }
   return response
 }

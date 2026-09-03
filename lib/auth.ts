@@ -6,13 +6,8 @@ export const OWNER_SESSION_SECONDS = 60 * 60 * 24 * 90
 export type Role = 'owner' | 'guest'
 export type SessionClaims = { role: Role; expiresAt: number; keyVersion: string }
 
-// Wire format: `v1-<role>-<expiresAt>-<keyVersion>.<hex hmac>`.
-// The four fields' charsets exclude both separators, so a field can never
-// smuggle a separator in, and parsing requires exact part counts before
-// anything else is looked at. Keep the regexes and the separators in sync.
+// Wire format: `v1-<role>-<expiresAt>-<keyVersion>.<hex hmac>`. No field's charset admits a separator.
 const FORMAT = 'v1'
-const FIELD_SEP = '-'
-const SIG_SEP = '.'
 const ROLES: ReadonlySet<string> = new Set<Role>(['owner', 'guest'])
 const EXP_RE = /^\d{1,12}$/
 const KEY_VERSION_RE = /^[A-Za-z0-9]{1,32}$/
@@ -22,9 +17,7 @@ export function nowSeconds(): number {
   return Math.floor(Date.now() / 1000)
 }
 
-// Not a secret: it is a revocation epoch. Bumping it invalidates every
-// outstanding token (guest links AND owner sessions). Defaults so a deploy
-// without the env var set keeps working.
+// A revocation epoch, not a secret: bumping it invalidates every outstanding token.
 export function currentKeyVersion(): string {
   const kv = process.env.SHARE_KEY_VERSION ?? '1'
   if (!KEY_VERSION_RE.test(kv)) {
@@ -44,8 +37,27 @@ export function signSession(claims: { role: Role; expiresAt: number }): string {
   }
   const exp = String(claims.expiresAt)
   if (!EXP_RE.test(exp)) throw new Error('expiresAt out of range')
-  const payload = [FORMAT, claims.role, exp, currentKeyVersion()].join(FIELD_SEP)
-  return `${payload}${SIG_SEP}${sign(payload)}`
+  const payload = [FORMAT, claims.role, exp, currentKeyVersion()].join('-')
+  return `${payload}.${sign(payload)}`
+}
+
+// The only place a session cookie is defined, so expiry and maxAge cannot drift
+// apart. The floor guards a token that expires between verifying and issuing.
+export function issueSession(
+  claims: { role: Role; expiresAt: number },
+  now: number = nowSeconds(),
+) {
+  return {
+    name: SESSION_COOKIE,
+    value: signSession(claims),
+    options: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: Math.max(1, claims.expiresAt - now),
+      path: '/',
+    },
+  } as const
 }
 
 export function verifySession(
@@ -54,43 +66,30 @@ export function verifySession(
 ): SessionClaims | null {
   if (!value) return null
 
-  const parts = value.split(SIG_SEP)
+  const parts = value.split('.')
   if (parts.length !== 2) return null
   const [payload, signature] = parts
   if (!SIG_RE.test(signature)) return null
 
-  const fields = payload.split(FIELD_SEP)
+  const fields = payload.split('-')
   if (fields.length !== 4) return null
   const [format, role, exp, keyVersion] = fields
   if (format !== FORMAT) return null
   if (!ROLES.has(role)) return null
   if (!EXP_RE.test(exp)) return null
-  if (!KEY_VERSION_RE.test(keyVersion)) return null
 
-  let expectedKeyVersion: string
-  try {
-    expectedKeyVersion = currentKeyVersion()
-  } catch {
-    return null
-  }
+  // Equality with a validated value implies the field is well-formed.
+  const expectedKeyVersion = process.env.SHARE_KEY_VERSION ?? '1'
+  if (!KEY_VERSION_RE.test(expectedKeyVersion)) return null
   if (keyVersion !== expectedKeyVersion) return null
 
-  // Sign the payload exactly as received -- never a re-serialization of the
-  // parsed fields -- so there is no canonicalization gap to exploit.
-  const expected = sign(payload)
-  const a = Buffer.from(signature)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length) return null
-  if (!timingSafeEqual(a, b)) return null
+  // Signed as received, never re-serialized, so there is no canonicalization gap.
+  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(sign(payload)))) return null
 
   const expiresAt = Number(exp)
   if (expiresAt <= now) return null
 
   return { role: role as Role, expiresAt, keyVersion }
-}
-
-export function remainingSeconds(claims: SessionClaims, now: number = nowSeconds()): number {
-  return Math.max(0, claims.expiresAt - now)
 }
 
 // Only allow site-relative paths for `next`. Anything else falls back to

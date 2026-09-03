@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { createShareLink } from './actions'
-import { SHARE_DURATIONS, type ShareDuration } from '@/lib/share'
+import { type ShareDuration } from '@/lib/share'
 
 const DURATION_LABELS: Record<ShareDuration, string> = {
   '24h': '24 hours',
@@ -20,8 +20,7 @@ export function ShareControl() {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      // Clipboard can be unavailable (http, permissions). The input below is
-      // selectable, so the user can still copy by hand.
+      // Clipboard can be unavailable; the input stays selectable for manual copy.
     }
   }
 
@@ -30,8 +29,8 @@ export function ShareControl() {
       <form action={formAction} className="share-form">
         <label className="share-label" htmlFor="share-duration">Share for</label>
         <select id="share-duration" name="duration" className="sort" defaultValue="7d">
-          {(Object.keys(SHARE_DURATIONS) as ShareDuration[]).map((d) => (
-            <option key={d} value={d}>{DURATION_LABELS[d]}</option>
+          {Object.entries(DURATION_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
           ))}
         </select>
         <button type="submit" className="chip" disabled={pending}>

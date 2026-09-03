@@ -1,7 +1,6 @@
-import { signSession, verifySession, remainingSeconds, nowSeconds } from './auth'
+import { signSession, verifySession, nowSeconds, type SessionClaims } from './auth'
 
-// Closed allowlist. The server action never accepts raw seconds, so 30 days
-// is the hard ceiling on any link's life.
+// Closed allowlist, so 30 days is the hard ceiling on any link's life.
 export const SHARE_DURATIONS = {
   '24h': 60 * 60 * 24,
   '7d': 60 * 60 * 24 * 7,
@@ -15,10 +14,7 @@ export function isShareDuration(value: unknown): value is ShareDuration {
   return typeof value === 'string' && Object.hasOwn(SHARE_DURATIONS, value)
 }
 
-// Vercel sets x-forwarded-host / x-forwarded-proto on every deployment, and
-// Next's server-action CSRF check has already verified Origin against
-// Host / X-Forwarded-Host by the time an action runs, so these headers are
-// the origin the owner's browser attested to. Falls back for `next dev`.
+// Next's server-action CSRF check has already validated these headers against Origin.
 export function shareOrigin(headers: Headers): string | null {
   const host = headers.get('x-forwarded-host') ?? headers.get('host')
   if (!host) return null
@@ -39,8 +35,7 @@ export function buildShareLink(input: {
 }): ShareLinkResult {
   const now = input.now ?? nowSeconds()
 
-  // Authorization first, and inside this function, so the gate holds for a
-  // hand-crafted POST just as it does for the UI.
+  // Authorization inside this function, so the gate holds for a hand-crafted POST.
   const session = verifySession(input.cookie, now)
   if (!session || session.role !== 'owner') {
     return { ok: false, message: 'Only the passcode session can create share links.' }
@@ -59,7 +54,7 @@ export function buildShareLink(input: {
 }
 
 export type ShareVisit =
-  | { kind: 'set'; value: string; maxAge: number }
+  | { kind: 'set'; claims: SessionClaims }
   | { kind: 'keep' }
   | { kind: 'reject' }
 
@@ -78,6 +73,5 @@ export function resolveShareVisit(input: {
   const existing = verifySession(input.existingCookie, now)
   if (existing?.role === 'owner') return { kind: 'keep' }
 
-  // The cookie can never outlive the link: its lifetime is what is left.
-  return { kind: 'set', value: input.token!, maxAge: Math.max(1, remainingSeconds(claims, now)) }
+  return { kind: 'set', claims }
 }
