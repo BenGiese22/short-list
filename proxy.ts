@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { SESSION_COOKIE, isValidSession } from './lib/auth'
+import { SESSION_COOKIE, verifySession } from './lib/auth'
 
 export function proxy(request: NextRequest) {
   const cookie = request.cookies.get(SESSION_COOKIE)?.value
-  if (isValidSession(cookie)) {
+  // Any valid role may view. Owner-only actions gate themselves in lib/share.
+  if (verifySession(cookie)) {
     return NextResponse.next()
   }
   const url = new URL('/enter', request.url)
