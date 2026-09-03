@@ -48,10 +48,15 @@ would render nothing.
 vercel env add SITE_PASSCODE production      # the passcode you and Megan will type
 vercel env add COOKIE_SECRET production      # openssl rand -hex 32
 vercel env add REVALIDATE_SECRET production  # openssl rand -hex 32
+vercel env add SHARE_KEY_VERSION production  # optional; "1" -- bump to kill all share links
 ```
 
-`COOKIE_SECRET` signs the session cookie — rotating it logs everyone out, which is your
-revocation mechanism if a passcode ever leaks.
+`COOKIE_SECRET` signs the session cookie *and* every share link. Rotating it logs
+everyone out and kills every link — use it if the secret itself may have leaked. For
+the lighter case of "a share link got forwarded further than I wanted", bump
+`SHARE_KEY_VERSION` instead: every outstanding link dies, and you and Megan re-enter
+the passcode once. There is no per-link revocation by design (no server-side state;
+the app's Turso token is read-only).
 
 ## 4. Deploy
 
@@ -101,7 +106,18 @@ Visit the deployed URL. You should be redirected to `/enter`, and the passcode s
 get you in for ~90 days per device. Then confirm real listings render with real photos,
 search/sort/filter work, and a listing opens its detail page and its Compass link.
 
+Then, as the passcode session, use "Share for 24 hours → Create link", open the link in
+a private window, and confirm it shows the list *without* the share control. Its cookie
+should expire when the link does, not in 90 days.
+
 ## Known trade-offs, decided deliberately
+
+- **Share links are stateless bearer tokens.** Anyone holding an unexpired link can view
+  the list and can forward the link; the only controls are the expiry you picked
+  (24h/7d/30d) and the all-or-nothing `SHARE_KEY_VERSION` bump. Deploying the
+  share-link change invalidated every previously issued session cookie once (the payload
+  format changed); that was accepted rather than carrying a dual-format grace period in
+  a security module.
 
 - **Photo upload shells out to the Vercel CLI.** The spec asked for a plain `requests`
   PUT against Blob's REST API with no Node dependency; the implementation plan
