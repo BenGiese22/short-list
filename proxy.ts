@@ -19,6 +19,6 @@ export function proxy(request: NextRequest) {
 // Vercel then reports as a successful cron run. Silent and permanent.
 export const config = {
   matcher: [
-    '/((?!enter(?:/|$)|api/revalidate(?:/|$)|api/pipeline(?:/|$)|_next/static|_next/image|favicon\\.ico).*)',
+    '/((?!enter(?:/|$)|s(?:/|$)|api/revalidate(?:/|$)|api/pipeline(?:/|$)|_next/static|_next/image|favicon\\.ico).*)',
   ],
 }
