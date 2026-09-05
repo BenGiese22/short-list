@@ -3,8 +3,10 @@ import {
   BOOTSTRAP_EXIT_HINT,
   DEFAULT_GIT_URL,
   REPO_DIR,
+  SESSION_PATH,
   createRunHandler,
   repoDirFromGitUrl,
+  repoPath,
 } from './run-handler'
 
 const env = {
@@ -197,5 +199,20 @@ describe('bootstrap failure', () => {
     // `fork/exec venv/bin/python: no such file or directory`, which says
     // nothing about the pip install that actually broke. Observed for real.
     expect(BOOTSTRAP_EXIT_HINT).toMatch(/bootstrap\.sh failed/)
+  })
+})
+
+describe('paths inside the checkout', () => {
+  it('are spelled out in full rather than relying on cwd', () => {
+    // The file APIs accept a `cwd` and ignore it. A launch that trusted it
+    // put the Compass session at /vercel/data/.auth/compass_state.json while
+    // the checkout was /vercel/home-search -- so the run logged in cold and
+    // the reaper read markers from a tree that had none.
+    expect(repoPath('data/.run/started')).toBe('home-search/data/.run/started')
+    expect(repoPath(SESSION_PATH)).toBe(`home-search/${SESSION_PATH}`)
+  })
+
+  it('is the same prefix the reaper reads', () => {
+    expect(repoPath('x').startsWith(`${REPO_DIR}/`)).toBe(true)
   })
 })

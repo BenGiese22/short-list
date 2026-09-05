@@ -1,7 +1,7 @@
 import { isCronAuthorized } from './auth'
 import { parseDone, parseStarted } from './markers'
 import { decideReap, type SandboxStatus } from './reap-decision'
-import { REPO_DIR, RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME } from './run-handler'
+import { RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME, repoPath } from './run-handler'
 
 /**
  * The reaper: what stops a finished sandbox, and the only thing that does.
@@ -61,14 +61,14 @@ export function createReapHandler({
     const sandbox = await getSandbox().catch(() => null)
     if (!sandbox) return Response.json({ idle: true }, { status: 200 })
 
-    // cwd matters: a git-sourced sandbox clones into a subdirectory, so
-    // reading these from the default cwd finds nothing and every run looks
-    // like it never started.
+    // Explicit paths, not cwd: the file APIs accept a cwd and ignore it, so
+    // reading these any other way finds an empty tree and reads every run as
+    // never started -- silently, in the direction that leaves billing on.
     const started = parseStarted(
-      await sandbox.readFileToBuffer({ path: `${RUN_DIR}/started`, cwd: REPO_DIR }),
+      await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/started`) }),
     )
     const done = parseDone(
-      await sandbox.readFileToBuffer({ path: `${RUN_DIR}/done`, cwd: REPO_DIR }),
+      await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/done`) }),
     )
     const action = decideReap({
       status: (sandbox.status ?? 'running') as SandboxStatus,
@@ -92,7 +92,7 @@ export function createReapHandler({
     // reachable by resuming it. src/auth.py re-saves the session on every
     // run, so this copy is the newest one that exists.
     try {
-      const session = await sandbox.readFileToBuffer({ path: SESSION_PATH, cwd: REPO_DIR })
+      const session = await sandbox.readFileToBuffer({ path: repoPath(SESSION_PATH) })
       if (session) await putState(STATE_BLOB_PATHNAME, session)
     } catch {
       // Never let this stop the stop. The reaper's job is to end billing;

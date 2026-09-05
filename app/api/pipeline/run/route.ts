@@ -43,10 +43,12 @@ const handle = createRunHandler({
 
 export async function GET(request: Request) {
   const response = await handle(request)
-  // A cron reads no response body, so without this a failure is invisible:
-  // the logs show a bare 500 and the message saying why is thrown away.
-  if (response.status >= 500) {
-    console.error(`[pipeline/run] ${response.status} ${await response.clone().text()}`)
-  }
+  // Same reasoning as the reaper: a cron reads no response body, so without
+  // this the logs show a bare status code and the message explaining it is
+  // thrown away. Skipped runs and launches are worth seeing too -- "why did
+  // nothing happen tonight" is answered by the 200 that said in-progress.
+  const body = await response.clone().text()
+  if (response.status >= 500) console.error(`[pipeline/run] ${response.status} ${body}`)
+  else console.log(`[pipeline/run] ${response.status} ${body}`)
   return response
 }

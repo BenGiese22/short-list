@@ -51,10 +51,12 @@ const handle = createReapHandler({ getSandbox, putState, notify, env: process.en
 
 export async function GET(request: Request) {
   const response = await handle(request)
-  // A cron reads no response body, so without this a failure is invisible:
-  // the logs show a bare 500 and the message saying why is thrown away.
-  if (response.status >= 500) {
-    console.error(`[pipeline/reap] ${response.status} ${await response.clone().text()}`)
-  }
+  // Logged on EVERY run, not just failures. This one decides whether a
+  // sandbox keeps billing, and a 200 that quietly did nothing is exactly as
+  // interesting as a 500 -- it is what a wrong decision looks like. At one
+  // invocation every ten minutes the volume is not worth optimising.
+  const body = await response.clone().text()
+  if (response.status >= 500) console.error(`[pipeline/reap] ${response.status} ${body}`)
+  else console.log(`[pipeline/reap] ${response.status} ${body}`)
   return response
 }
