@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createReapHandler } from './reap-handler'
+import { createReapHandler, toEpochMs } from './reap-handler'
 
 const env = { CRON_SECRET: 's3cret', NTFY_TOPIC: 'topic' }
 const req = (auth: string | null = 'Bearer s3cret') =>
@@ -137,5 +137,23 @@ describe('reaper route', () => {
 
     expect(res.status).toBe(200)
     expect(sbx.stop, 'billing must still be stopped').toHaveBeenCalled()
+  })
+})
+
+describe('toEpochMs', () => {
+  it('accepts the shapes the SDK has used', () => {
+    expect(toEpochMs(new Date('2026-09-05T03:19:14Z'))).toBe(1788578354000)
+    expect(toEpochMs('2026-09-05T03:19:14Z')).toBe(1788578354000)
+    expect(toEpochMs(1788578354000)).toBe(1788578354000)
+  })
+
+  it('returns null for anything it cannot read', () => {
+    // null makes decideReap fall back to "still bootstrapping", which is the
+    // safe direction: never reap a live run because a field changed shape.
+    expect(toEpochMs(undefined)).toBeNull()
+    expect(toEpochMs(null)).toBeNull()
+    expect(toEpochMs('not a date')).toBeNull()
+    expect(toEpochMs(new Date('nonsense'))).toBeNull()
+    expect(toEpochMs({})).toBeNull()
   })
 })

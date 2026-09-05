@@ -12,8 +12,29 @@ import type { DoneMarker, StartedMarker } from './markers'
  */
 export const MAX_RUN_AGE_MS = 3 * 60 * 60 * 1000
 
+/**
+ * How long a sandbox may exist without a `started` marker before the reaper
+ * treats it as orphaned rather than still bootstrapping.
+ *
+ * bootstrap.sh is budgeted at two minutes cold, so fifteen is generous
+ * enough that no honest bootstrap trips it. It exists because the launcher
+ * provisions the sandbox BEFORE it writes anything: if it then throws --
+ * a bad store id, an SDK call that fails, a timeout -- the sandbox is left
+ * running with no marker, and the "still bootstrapping" branch below used to
+ * return noop for that state forever. The platform's own 3h timeout was the
+ * only thing that stopped it, at roughly $0.70 of provisioned memory a go.
+ *
+ * Observed on the first real cloud launch, which had to be stopped by hand.
+ */
+export const BOOTSTRAP_BUDGET_MS = 15 * 60 * 1000
+
 export type SandboxStatus = 'absent' | 'running' | 'stopped' | 'failed'
-export type ReapAction = 'noop' | 'collect-and-stop' | 'stop-hung' | 'alert-failed'
+export type ReapAction =
+  | 'noop'
+  | 'collect-and-stop'
+  | 'stop-hung'
+  | 'stop-orphaned'
+  | 'alert-failed'
 
 /**
  * What the reaper should do, as a pure function.
@@ -32,13 +53,17 @@ export function decideReap({
   started,
   done,
   now,
+  createdAt = null,
   maxAgeMs = MAX_RUN_AGE_MS,
+  bootstrapBudgetMs = BOOTSTRAP_BUDGET_MS,
 }: {
   status: SandboxStatus
   started: StartedMarker | null
   done: DoneMarker | null
   now: number
+  createdAt?: number | null
   maxAgeMs?: number
+  bootstrapBudgetMs?: number
 }): ReapAction {
   // Worth knowing about whatever the markers say: the sandbox itself dying
   // is a different failure from the pipeline failing inside it.
@@ -55,7 +80,17 @@ export function decideReap({
     return now - started.started_at > maxAgeMs ? 'stop-hung' : 'noop'
   }
 
-  // Neither marker yet: bootstrap is still going. Cloning and installing
-  // takes a while, and stopping here would kill every run at its first reap.
+  // Neither marker yet. Usually that means bootstrap is still going --
+  // cloning and installing takes a while, and stopping here would kill every
+  // run at its first reap -- so this waits out a generous budget first.
+  //
+  // Past the budget it is not bootstrapping, it is orphaned: the launcher
+  // provisions the sandbox before it writes anything, so a launcher that
+  // throws afterwards leaves exactly this state. Without the budget it
+  // returned noop forever and the platform's 3h timeout was the only thing
+  // that ever stopped it.
+  if (createdAt !== null && now - createdAt > bootstrapBudgetMs) {
+    return 'stop-orphaned'
+  }
   return 'noop'
 }

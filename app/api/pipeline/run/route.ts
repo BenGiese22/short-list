@@ -42,5 +42,11 @@ const handle = createRunHandler({
 })
 
 export async function GET(request: Request) {
-  return handle(request)
+  const response = await handle(request)
+  // A cron reads no response body, so without this a failure is invisible:
+  // the logs show a bare 500 and the message saying why is thrown away.
+  if (response.status >= 500) {
+    console.error(`[pipeline/run] ${response.status} ${await response.clone().text()}`)
+  }
+  return response
 }

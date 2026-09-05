@@ -50,5 +50,11 @@ async function notify(title: string, message: string) {
 const handle = createReapHandler({ getSandbox, putState, notify, env: process.env })
 
 export async function GET(request: Request) {
-  return handle(request)
+  const response = await handle(request)
+  // A cron reads no response body, so without this a failure is invisible:
+  // the logs show a bare 500 and the message saying why is thrown away.
+  if (response.status >= 500) {
+    console.error(`[pipeline/reap] ${response.status} ${await response.clone().text()}`)
+  }
+  return response
 }
