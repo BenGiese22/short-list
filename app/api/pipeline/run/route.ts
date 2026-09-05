@@ -1,5 +1,7 @@
+import { metric } from '@vercel/functions'
 import { Sandbox } from '@vercel/sandbox'
 import { get } from '@vercel/blob'
+import { emitDecision } from '@/lib/pipeline/telemetry'
 import { createRunHandler } from '@/lib/pipeline/run-handler'
 import { requireStateStoreId } from '@/lib/pipeline/state-store'
 
@@ -50,5 +52,8 @@ export async function GET(request: Request) {
   const body = await response.clone().text()
   if (response.status >= 500) console.error(`[pipeline/run] ${response.status} ${body}`)
   else console.log(`[pipeline/run] ${response.status} ${body}`)
+  // The decision as a queryable dimension, not just a log line a human has
+  // to read the right word out of. See lib/pipeline/telemetry.ts.
+  emitDecision(metric, 'run', response.status, body)
   return response
 }
