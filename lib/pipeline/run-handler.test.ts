@@ -20,6 +20,7 @@ const env = {
   REVALIDATE_SECRET: 'rev',
   VERCEL_PROJECT_PRODUCTION_URL: 'short-list.example',
   STATE_BLOB_STORE_ID: 'store_state',
+  MAPBOX_ACCESS_TOKEN: 'sk.routing-token',
 }
 
 function fakeSandbox(overrides: Record<string, unknown> = {}) {

@@ -10,6 +10,7 @@ const complete = {
   BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_x_y',
   REVALIDATE_SECRET: 'revalidate-me',
   VERCEL_PROJECT_PRODUCTION_URL: 'short-list.example',
+  MAPBOX_ACCESS_TOKEN: 'sk.routing-token',
 }
 
 describe('buildRunnerEnv', () => {
@@ -44,6 +45,30 @@ describe('buildRunnerEnv', () => {
   it('passes optional vars through only when set', () => {
     expect(buildRunnerEnv(complete).NTFY_TOPIC).toBeUndefined()
     expect(buildRunnerEnv({ ...complete, NTFY_TOPIC: 't' }).NTFY_TOPIC).toBe('t')
+  })
+
+  it('passes the routing token through', () => {
+    // The commutes stage cannot run without it, and it is the one thing in
+    // this list that is not about Compass, Turso or Blob.
+    expect(buildRunnerEnv(complete).MAPBOX_ACCESS_TOKEN).toBe('sk.routing-token')
+  })
+
+  it('throws naming MAPBOX_ACCESS_TOKEN when it is absent', () => {
+    // Required, not optional: a run that cannot compute commutes should not
+    // start. Optional would mean discovering this three stages in, after
+    // Chromium has scraped and the photos have uploaded.
+    const { MAPBOX_ACCESS_TOKEN, ...partial } = complete
+    expect(() => buildRunnerEnv(partial)).toThrow(/MAPBOX_ACCESS_TOKEN/)
+  })
+
+  it('never puts the routing token in the error either', () => {
+    const { REVALIDATE_SECRET, ...partial } = complete
+    try {
+      buildRunnerEnv(partial)
+      throw new Error('should have thrown')
+    } catch (error) {
+      expect((error as Error).message).not.toContain('sk.routing-token')
+    }
   })
 
   it('throws naming every missing required var', () => {
