@@ -1,0 +1,26 @@
+# Screenshot capture image: Playwright plus a headless Chromium.
+#
+# Kept separate from Dockerfile.dev on purpose. Chromium and its system
+# libraries add roughly a gigabyte, and the everyday `npm run dev:docker` loop
+# should not pay for a tool used once per pull request.
+#
+# Built on first `npm run dev:shots` and then cached.
+FROM node:24-slim
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+WORKDIR /work
+
+# --with-deps installs the system libraries Chromium needs on Debian, which is
+# the bulk of this image.
+RUN npm install -g playwright@1 \
+    && npx playwright install --with-deps chromium \
+    && chown -R node:node /ms-playwright /work
+
+# The script imports `playwright`, so it has to resolve from a local
+# node_modules rather than only the global install.
+RUN npm init -y >/dev/null && npm install playwright@1 && chown -R node:node /work
+
+USER node
+
+ENTRYPOINT []
+CMD ["node", "/work/scripts/shots.ts", "--out", "/work/out"]
