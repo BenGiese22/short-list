@@ -1,6 +1,6 @@
 import { isCronAuthorized } from './auth'
 import { parseDone, parseStarted } from './markers'
-import { decideReap, type SandboxStatus } from './reap-decision'
+import { decideReap, readStatus } from './reap-decision'
 import { RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME, repoPath } from './run-handler'
 
 /**
@@ -18,7 +18,8 @@ import { RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME, repoPath } from './run-hand
  */
 
 type MinimalSandbox = {
-  status?: string
+  /** A method on the real SDK, not a property -- see readStatus. */
+  status?: unknown
   /** When the sandbox was provisioned; used to tell bootstrapping from orphaned. */
   createdAt?: number | string | Date
   readFileToBuffer(file: { path: string; cwd?: string }): Promise<Buffer | null>
@@ -71,7 +72,7 @@ export function createReapHandler({
       await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/done`) }),
     )
     const action = decideReap({
-      status: (sandbox.status ?? 'running') as SandboxStatus,
+      status: readStatus(sandbox),
       started,
       done,
       now: now(),
