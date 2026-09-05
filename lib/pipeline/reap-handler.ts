@@ -19,8 +19,25 @@ import { RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME } from './run-handler'
 
 type MinimalSandbox = {
   status?: string
+  /** When the sandbox was provisioned; used to tell bootstrapping from orphaned. */
+  createdAt?: number | string | Date
   readFileToBuffer(file: { path: string }): Promise<Buffer | null>
   stop(): Promise<unknown>
+}
+
+/** The SDK has returned this as a Date, a number and an ISO string across
+ * versions, so it is normalised here rather than trusted. Unparseable means
+ * null, which makes decideReap fall back to "still bootstrapping" -- the
+ * old, safe behaviour. */
+export function toEpochMs(value: unknown): number | null {
+  if (value == null) return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.getTime()
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    return Number.isNaN(parsed) ? null : parsed
+  }
+  return null
 }
 
 export function createReapHandler({
@@ -51,6 +68,7 @@ export function createReapHandler({
       started,
       done,
       now: now(),
+      createdAt: toEpochMs(sandbox.createdAt),
     })
 
     if (action === 'noop') {
@@ -76,7 +94,16 @@ export function createReapHandler({
 
     await sandbox.stop()
 
-    if (action === 'stop-hung') {
+    if (action === 'stop-orphaned') {
+      // Not the pipeline failing -- the launcher failing after it had already
+      // provisioned. Worth a distinct message: the fix is in the route, not
+      // in the run.
+      await notify(
+        'home-search: orphaned sandbox stopped',
+        'A sandbox was provisioned but no run ever started in it. The launcher ' +
+          'most likely failed after creating it; check the function logs.',
+      )
+    } else if (action === 'stop-hung') {
       await notify(
         'home-search: run hung',
         `A ${started?.job ?? 'pipeline'} run started but never finished; the sandbox was stopped.`,

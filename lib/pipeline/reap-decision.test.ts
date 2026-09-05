@@ -83,3 +83,40 @@ describe('decideReap', () => {
     })).toBe('noop')
   })
 })
+
+describe('a sandbox that never started a run', () => {
+  const base = { status: 'running' as const, started: null, done: null }
+
+  it('is left alone while it could still be bootstrapping', () => {
+    // Stopping here would kill every run at its first reap.
+    expect(
+      decideReap({ ...base, now: 10 * 60_000, createdAt: 5 * 60_000 }),
+    ).toBe('noop')
+  })
+
+  it('is stopped once it is past any honest bootstrap', () => {
+    // The launcher provisions BEFORE it writes anything, so a launcher that
+    // throws afterwards leaves exactly this state. This branch used to
+    // return noop forever and the platform's 3h timeout was the only thing
+    // that stopped it -- observed for real on the first cloud launch.
+    expect(
+      decideReap({ ...base, now: 40 * 60_000, createdAt: 5 * 60_000 }),
+    ).toBe('stop-orphaned')
+  })
+
+  it('falls back to leaving it alone when the age is unknown', () => {
+    // An SDK that stops reporting createdAt must not start reaping live runs.
+    expect(decideReap({ ...base, now: 9e9, createdAt: null })).toBe('noop')
+  })
+
+  it('never overrides a run that has actually started', () => {
+    expect(
+      decideReap({
+        ...base,
+        started: { started_at: 9e9, job: 'pipeline' },
+        now: 9e9,
+        createdAt: 0,
+      }),
+    ).toBe('noop')
+  })
+})
