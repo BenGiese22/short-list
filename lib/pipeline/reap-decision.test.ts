@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { decideReap, MAX_RUN_AGE_MS } from './reap-decision'
+import { decideReap, readStatus, MAX_RUN_AGE_MS } from './reap-decision'
 
 const now = 1_000_000_000_000
 
@@ -118,5 +118,53 @@ describe('a sandbox that never started a run', () => {
         createdAt: 0,
       }),
     ).toBe('noop')
+  })
+})
+
+describe('readStatus', () => {
+  it('calls status when the SDK exposes it as a method', () => {
+    // The real bug: @vercel/sandbox exposes status() as a method. Read as a
+    // property it yields the function object -- truthy, and never equal to
+    // any status string -- so a stopped sandbox looked running and the
+    // reaper resumed it every ten minutes to stop it again, 144 times a day.
+    expect(readStatus({ status: () => 'stopped' })).toBe('stopped')
+    expect(readStatus({ status: () => 'running' })).toBe('running')
+  })
+
+  it('still reads a plain property, in case that ever comes back', () => {
+    expect(readStatus({ status: 'stopped' })).toBe('stopped')
+  })
+
+  it('treats a missing sandbox as absent', () => {
+    expect(readStatus(null)).toBe('absent')
+  })
+
+  it('falls back to running for anything unreadable', () => {
+    // Erring towards "running" keeps the reaper willing to stop something,
+    // which is the safe direction: the cost of a needless check is seconds,
+    // the cost of never reaping is three hours of provisioned memory.
+    expect(readStatus({})).toBe('running')
+    expect(readStatus({ status: 42 })).toBe('running')
+  })
+})
+
+describe('a sandbox that is not running', () => {
+  const markers = {
+    started: { started_at: 0, job: 'pipeline' },
+    done: { exit_code: 0, finished_at: 1, job: 'pipeline' },
+    now: 9e9,
+  }
+
+  it.each(['stopped', 'aborted', 'stopping', 'snapshotting', 'pending', 'absent'] as const)(
+    'is left alone when %s, even with a done marker on disk',
+    (status) => {
+      // The done marker outlives the run that wrote it. Acting on it against
+      // an already-stopped sandbox means resuming one purely to stop it.
+      expect(decideReap({ ...markers, status })).toBe('noop')
+    },
+  )
+
+  it('still alerts when the sandbox itself failed', () => {
+    expect(decideReap({ ...markers, status: 'failed' })).toBe('alert-failed')
   })
 })

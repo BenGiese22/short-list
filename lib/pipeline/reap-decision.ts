@@ -28,7 +28,45 @@ export const MAX_RUN_AGE_MS = 3 * 60 * 60 * 1000
  */
 export const BOOTSTRAP_BUDGET_MS = 15 * 60 * 1000
 
-export type SandboxStatus = 'absent' | 'running' | 'stopped' | 'failed'
+/**
+ * The SDK's own status union, plus `absent` for "no sandbox at all".
+ *
+ * Wider than it looks, and getting it wrong is expensive -- see readStatus.
+ */
+export type SandboxStatus =
+  | 'absent'
+  | 'pending'
+  | 'running'
+  | 'stopping'
+  | 'stopped'
+  | 'failed'
+  | 'aborted'
+  | 'snapshotting'
+
+/**
+ * Read a sandbox's status, whichever shape the SDK exposes it in.
+ *
+ * `status` is a METHOD on @vercel/sandbox, not a property. Reading it as a
+ * property yields the function object -- always truthy, never equal to any
+ * status string -- so `sandbox.status ?? 'running'` silently evaluated to a
+ * function that then failed every comparison and fell through to the `done`
+ * branch.
+ *
+ * The effect was a reaper that returned collect-and-stop every ten minutes
+ * forever: it resumed a stopped sandbox to read its markers, found the last
+ * run's `done` still on disk, and stopped it again. 144 resume/stop cycles a
+ * day against a sandbox nobody was using, each billing ~20s of provisioned
+ * 4GB. Observed in production on 2026-09-05.
+ *
+ * Both shapes are handled because being wrong about this once was enough.
+ */
+export function readStatus(sandbox: { status?: unknown } | null): SandboxStatus {
+  if (!sandbox) return 'absent'
+  const raw = typeof sandbox.status === 'function'
+    ? (sandbox.status as () => unknown)()
+    : sandbox.status
+  return typeof raw === 'string' ? (raw as SandboxStatus) : 'running'
+}
 export type ReapAction =
   | 'noop'
   | 'collect-and-stop'
@@ -68,7 +106,13 @@ export function decideReap({
   // Worth knowing about whatever the markers say: the sandbox itself dying
   // is a different failure from the pipeline failing inside it.
   if (status === 'failed') return 'alert-failed'
-  if (status === 'absent' || status === 'stopped') return 'noop'
+
+  // Anything not currently running is left alone. `stopped` and `aborted`
+  // are already at rest; `stopping` and `snapshotting` are getting there on
+  // their own; `pending` has not started. Acting on any of them means
+  // resuming a sandbox purely to stop it again, which is what the property
+  // -vs-method bug did 144 times a day.
+  if (status !== 'running') return 'noop'
 
   // Finished, cleanly or not. Either way the results are collected and the
   // session is stopped — a non-zero exit still has to stop billing.
