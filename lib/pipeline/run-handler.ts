@@ -51,6 +51,23 @@ export const REPO_DIR = repoDirFromGitUrl(DEFAULT_GIT_URL)
 /** Named so the failure is asserted rather than restated in a test. */
 export const BOOTSTRAP_EXIT_HINT = 'bootstrap.sh failed'
 
+/**
+ * A path inside the checkout, spelled out in full.
+ *
+ * The file APIs take a `cwd` in their type signature and IGNORE it. Verified
+ * the hard way: a launch that passed `cwd` to writeFiles put the Compass
+ * session at /vercel/data/.auth/compass_state.json (3336 bytes, the Blob
+ * copy) while the checkout is /vercel/home-search -- so the run found no
+ * session and logged in cold, and the reaper read markers from a tree that
+ * has none and concluded no run had ever started.
+ *
+ * runCommand's cwd does work, and is still used for commands. For files,
+ * only an explicit path can be trusted.
+ */
+export function repoPath(relative: string): string {
+  return `${REPO_DIR}/${relative}`
+}
+
 /** Three hours: score_photos.py legitimately waits hours on a vision batch. */
 export const SANDBOX_TIMEOUT_MS = 3 * 60 * 60 * 1000
 
@@ -111,9 +128,11 @@ export function createRunHandler({
       // Already running? The markers are on the sandbox's own disk because
       // the runner holds no Vercel credential and cannot report in.
       const started = parseStarted(
-        await sandbox.readFileToBuffer({ path: `${RUN_DIR}/started`, cwd }),
+        await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/started`) }),
       )
-      const done = parseDone(await sandbox.readFileToBuffer({ path: `${RUN_DIR}/done`, cwd }))
+      const done = parseDone(
+        await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/done`) }),
+      )
       if (started && !done) {
         return Response.json({ skipped: 'in-progress', job: started.job }, { status: 200 })
       }
@@ -141,12 +160,12 @@ export function createRunHandler({
       // src/auth.py re-saves it every run, so the sandbox copy is newer than
       // whatever Blob holds. A cold login works if neither exists -- it is
       // just the thing the warm-session design exists to keep rare.
-      const onDisk = await sandbox.readFileToBuffer({ path: SESSION_PATH, cwd })
+      const onDisk = await sandbox.readFileToBuffer({ path: repoPath(SESSION_PATH) })
       if (!onDisk) {
         const seeded = await getState(STATE_BLOB_PATHNAME)
         if (seeded) {
           await sandbox.writeFiles([
-            { path: SESSION_PATH, content: seeded, cwd, mode: 0o600 },
+            { path: repoPath(SESSION_PATH), content: seeded, mode: 0o600 },
           ])
         }
       }
