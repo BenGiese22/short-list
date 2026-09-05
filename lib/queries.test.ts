@@ -53,8 +53,8 @@ async function seed(db: Client) {
   await db.execute(
     "INSERT INTO commute VALUES ('a', 12.4, 20.063333, 15.1, 25.5)"
   )
-  // 'b' intentionally has no commute row, matching production listings whose
-  // geocoding failed -- denver_minutes must come back NULL, not throw.
+  // 'b' intentionally has no commute row, matching a listing whose address
+  // will not geocode -- the commute column must come back NULL, not throw.
 }
 
 describe('buildListingsQuery', () => {
@@ -115,12 +115,23 @@ describe('buildListingsQuery', () => {
     expect(byId['b']).toBeNull()
   })
 
-  it('includes denver_minutes from the commute table, or null when no commute row exists', async () => {
+  it('includes medtronic_minutes from the commute table, or null when no commute row exists', async () => {
+    // The Medtronic (Lafayette) leg specifically. The card showed
+    // denver_minutes until 2026-09-05, which is a different destination from
+    // the one commute_score is built on -- so "Sort: Commute" reordered the
+    // list by a number the cards never displayed.
     const { sql, args } = buildListingsQuery({})
     const result = await db.execute({ sql, args })
-    const byId = Object.fromEntries(result.rows.map((r) => [r.listing_id, r.denver_minutes]))
-    expect(byId['a']).toBeCloseTo(20.063333)
+    const byId = Object.fromEntries(result.rows.map((r) => [r.listing_id, r.medtronic_minutes]))
+    expect(byId['a']).toBeCloseTo(25.5)
     expect(byId['b']).toBeNull()
+  })
+
+  it('does not select the Denver leg for the card', async () => {
+    // Still computed and stored, and still on the detail query -- but the
+    // list card must not show a destination the score does not measure.
+    const { sql } = buildListingsQuery({})
+    expect(sql).not.toMatch(/c\.denver_minutes/)
   })
 })
 
