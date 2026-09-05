@@ -102,6 +102,20 @@ export function createReapHandler({
       createdAt: toEpochMs(sandbox.createdAt),
     })
 
+    // The invariant, stated rather than assumed.
+    //
+    // Every action but noop stops a sandbox, and stopping one that was not
+    // running means the reaper woke it to do so -- exactly the loop that ran
+    // 144 times a day. The early return above makes this structurally true
+    // today; asserting it means a future edit that reorders these cannot
+    // quietly reintroduce it. A thrown error becomes a 500, which is the one
+    // thing Vercel's alerting can already see.
+    if (action !== 'noop' && status !== 'running') {
+      throw new Error(
+        `reaper invariant violated: action=${action} with sandbox status=${status}`,
+      )
+    }
+
     if (action === 'noop') {
       return Response.json({ action, running: Boolean(started && !done) }, { status: 200 })
     }
