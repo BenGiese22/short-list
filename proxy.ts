@@ -12,8 +12,12 @@ export function proxy(request: NextRequest) {
   return NextResponse.redirect(url)
 }
 
+// api/pipeline covers both /run and /reap. It must stay a LITERAL string:
+// Next reads this matcher statically and silently ignores a computed one,
+// so a clever refactor here fails by redirecting the cron to /enter — which
+// Vercel then reports as a successful cron run. Silent and permanent.
 export const config = {
   matcher: [
-    '/((?!enter(?:/|$)|api/revalidate(?:/|$)|_next/static|_next/image|favicon\\.ico).*)',
+    '/((?!enter(?:/|$)|api/revalidate(?:/|$)|api/pipeline(?:/|$)|_next/static|_next/image|favicon\\.ico).*)',
   ],
 }
