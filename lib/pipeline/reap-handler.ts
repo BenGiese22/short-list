@@ -1,7 +1,7 @@
 import { isCronAuthorized } from './auth'
 import { parseDone, parseStarted } from './markers'
 import { decideReap, type SandboxStatus } from './reap-decision'
-import { RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME } from './run-handler'
+import { REPO_DIR, RUN_DIR, SESSION_PATH, STATE_BLOB_PATHNAME } from './run-handler'
 
 /**
  * The reaper: what stops a finished sandbox, and the only thing that does.
@@ -21,7 +21,7 @@ type MinimalSandbox = {
   status?: string
   /** When the sandbox was provisioned; used to tell bootstrapping from orphaned. */
   createdAt?: number | string | Date
-  readFileToBuffer(file: { path: string }): Promise<Buffer | null>
+  readFileToBuffer(file: { path: string; cwd?: string }): Promise<Buffer | null>
   stop(): Promise<unknown>
 }
 
@@ -61,8 +61,15 @@ export function createReapHandler({
     const sandbox = await getSandbox().catch(() => null)
     if (!sandbox) return Response.json({ idle: true }, { status: 200 })
 
-    const started = parseStarted(await sandbox.readFileToBuffer({ path: `${RUN_DIR}/started` }))
-    const done = parseDone(await sandbox.readFileToBuffer({ path: `${RUN_DIR}/done` }))
+    // cwd matters: a git-sourced sandbox clones into a subdirectory, so
+    // reading these from the default cwd finds nothing and every run looks
+    // like it never started.
+    const started = parseStarted(
+      await sandbox.readFileToBuffer({ path: `${RUN_DIR}/started`, cwd: REPO_DIR }),
+    )
+    const done = parseDone(
+      await sandbox.readFileToBuffer({ path: `${RUN_DIR}/done`, cwd: REPO_DIR }),
+    )
     const action = decideReap({
       status: (sandbox.status ?? 'running') as SandboxStatus,
       started,
@@ -85,7 +92,7 @@ export function createReapHandler({
     // reachable by resuming it. src/auth.py re-saves the session on every
     // run, so this copy is the newest one that exists.
     try {
-      const session = await sandbox.readFileToBuffer({ path: SESSION_PATH })
+      const session = await sandbox.readFileToBuffer({ path: SESSION_PATH, cwd: REPO_DIR })
       if (session) await putState(STATE_BLOB_PATHNAME, session)
     } catch {
       // Never let this stop the stop. The reaper's job is to end billing;

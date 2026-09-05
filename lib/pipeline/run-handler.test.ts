@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createRunHandler } from './run-handler'
+import {
+  BOOTSTRAP_EXIT_HINT,
+  DEFAULT_GIT_URL,
+  REPO_DIR,
+  createRunHandler,
+  repoDirFromGitUrl,
+} from './run-handler'
 
 const env = {
   CRON_SECRET: 's3cret',
@@ -159,5 +165,37 @@ describe('launcher route', () => {
     expect(res.status).toBe(500)
     expect(body).toContain('PIPELINE_TURSO_AUTH_TOKEN')
     expect(body).not.toContain('rw')
+  })
+})
+
+describe('the sandbox working directory', () => {
+  it('derives the clone directory from the git url', () => {
+    // A git-sourced sandbox clones into a subdirectory named after the repo
+    // (/vercel/home-search) while commands default to /vercel. Getting this
+    // wrong is not a subtle failure: bootstrap.sh is invoked at a path that
+    // does not exist, and the seeded session lands in a tree no run reads.
+    expect(repoDirFromGitUrl('https://github.com/BenGiese22/home-search.git')).toBe('home-search')
+    expect(repoDirFromGitUrl('https://github.com/BenGiese22/home-search')).toBe('home-search')
+    expect(repoDirFromGitUrl('https://github.com/x/home-search/')).toBe('home-search')
+  })
+
+  it('refuses a url it cannot derive a directory from', () => {
+    expect(() => repoDirFromGitUrl('')).toThrow()
+    expect(() => repoDirFromGitUrl('https://github.com/')).toThrow()
+  })
+
+  it('is what the launcher and the reaper both address', () => {
+    // They must agree, or the reaper reads an empty tree and every run looks
+    // like it never started.
+    expect(REPO_DIR).toBe(repoDirFromGitUrl(DEFAULT_GIT_URL))
+  })
+})
+
+describe('bootstrap failure', () => {
+  it('is reported where it happened, not one step later', () => {
+    // Unchecked, a failed bootstrap resurfaces as
+    // `fork/exec venv/bin/python: no such file or directory`, which says
+    // nothing about the pip install that actually broke. Observed for real.
+    expect(BOOTSTRAP_EXIT_HINT).toMatch(/bootstrap\.sh failed/)
   })
 })
