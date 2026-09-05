@@ -157,3 +157,72 @@ describe('toEpochMs', () => {
     expect(toEpochMs({})).toBeNull()
   })
 })
+
+describe('a sandbox that is not running', () => {
+  function spySandbox(status: string) {
+    const reads: string[] = []
+    return {
+      reads,
+      sandbox: {
+        status: () => status,
+        readFileToBuffer: async ({ path }: { path: string }) => {
+          reads.push(path)
+          return null
+        },
+        stop: async () => undefined,
+      },
+    }
+  }
+
+  it('is never touched, because touching it wakes it', async () => {
+    // The bug this exists for: readFileToBuffer auto-resumes a persistent
+    // sandbox. Reading markers first woke the sandbox, so the status check
+    // that followed truthfully said "running" -- and the reaper resumed and
+    // re-stopped an idle sandbox 144 times a day.
+    const { reads, sandbox } = spySandbox('stopped')
+    const handle = createReapHandler({
+      getSandbox: async () => sandbox as never,
+      putState: async () => undefined,
+      notify: async () => undefined,
+      env,
+    })
+
+    const res = await handle(req())
+
+    expect(await res.json()).toEqual({ action: 'noop', status: 'stopped' })
+    expect(reads).toEqual([])
+  })
+
+  it('does not stop a sandbox that is already stopping', async () => {
+    const { reads, sandbox } = spySandbox('stopping')
+    let stopped = false
+    const handle = createReapHandler({
+      getSandbox: async () => ({ ...sandbox, stop: async () => { stopped = true } }) as never,
+      putState: async () => undefined,
+      notify: async () => undefined,
+      env,
+    })
+
+    await handle(req())
+
+    expect(stopped).toBe(false)
+    expect(reads).toEqual([])
+  })
+
+  it('still alerts on a failed sandbox without reading its disk', async () => {
+    const { reads, sandbox } = spySandbox('failed')
+    const sent: string[] = []
+    const handle = createReapHandler({
+      getSandbox: async () => sandbox as never,
+      putState: async () => undefined,
+      notify: async (title: string) => { sent.push(title) },
+      env,
+    })
+
+    const res = await handle(req())
+
+    expect(await res.json()).toEqual({ action: 'alert-failed', status: 'failed' })
+    expect(sent[0]).toMatch(/sandbox failed/)
+    expect(reads).toEqual([])
+  })
+})
