@@ -62,6 +62,29 @@ export function createReapHandler({
     const sandbox = await getSandbox().catch(() => null)
     if (!sandbox) return Response.json({ idle: true }, { status: 200 })
 
+    // Status BEFORE any file read, and this ordering is the whole fix.
+    //
+    // readFileToBuffer auto-resumes a persistent sandbox -- the SDK says as
+    // much: "a persistent sandbox still auto-resumes on the first SDK call
+    // that needs a running session". So reading the markers first WAKES the
+    // sandbox, and the status check that follows then truthfully reports
+    // `running`, because the reaper just started it. Every tick found a
+    // stopped sandbox, resumed it, read the previous run's `done`, and
+    // stopped it again -- 144 times a day, for a run that ended hours ago.
+    const status = readStatus(sandbox)
+    if (status === 'failed') {
+      await notify(
+        'home-search: sandbox failed',
+        'The sandbox itself failed, not the pipeline inside it.',
+      )
+      return Response.json({ action: 'alert-failed', status }, { status: 200 })
+    }
+    if (status !== 'running') {
+      // Already at rest, or getting there on its own. Touching it would only
+      // wake it.
+      return Response.json({ action: 'noop', status }, { status: 200 })
+    }
+
     // Explicit paths, not cwd: the file APIs accept a cwd and ignore it, so
     // reading these any other way finds an empty tree and reads every run as
     // never started -- silently, in the direction that leaves billing on.
@@ -72,7 +95,7 @@ export function createReapHandler({
       await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/done`) }),
     )
     const action = decideReap({
-      status: readStatus(sandbox),
+      status,
       started,
       done,
       now: now(),
