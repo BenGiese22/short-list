@@ -1,0 +1,67 @@
+/**
+ * The environment handed to the pipeline running inside a Sandbox.
+ *
+ * An allowlist, deliberately. The sandbox runs Chromium against a
+ * third-party site; copying the function's whole environment into it would
+ * hand that VM every secret Vercel injects, including ones this project has
+ * no business exposing.
+ */
+
+/** Required. A run cannot start without every one of these. */
+export const REQUIRED_VARS = [
+  'COMPASS_EMAIL',
+  'COMPASS_PASSWORD',
+  'COMPASS_COLLECTION_URL',
+  'TURSO_DATABASE_URL',
+  // NOT short-list's own TURSO_AUTH_TOKEN: that one is read-only by design,
+  // because the viewer only ever reads. A pipeline writes, so it needs its
+  // own read-write token under a distinct name.
+  'PIPELINE_TURSO_AUTH_TOKEN',
+  'BLOB_READ_WRITE_TOKEN',
+  'REVALIDATE_SECRET',
+  'VERCEL_PROJECT_PRODUCTION_URL',
+] as const
+
+/** Passed through when present, omitted when not. */
+const OPTIONAL_VARS = [
+  'COMPASS_COLLECTION_TABS',
+  'LISTING_URLS',
+  'ANTHROPIC_API_KEY',
+  'NTFY_TOPIC',
+  'MAX_PHOTOS_PER_LISTING',
+] as const
+
+export function buildRunnerEnv(
+  source: Record<string, string | undefined>,
+): Record<string, string> {
+  const missing = REQUIRED_VARS.filter((name) => !source[name])
+  if (missing.length > 0) {
+    // Names only, never values: this message reaches logs and a 500 body.
+    throw new Error(
+      `pipeline runner is missing required environment variable(s): ${missing.join(', ')}`,
+    )
+  }
+
+  const env: Record<string, string> = {
+    COMPASS_EMAIL: source.COMPASS_EMAIL!,
+    COMPASS_PASSWORD: source.COMPASS_PASSWORD!,
+    COMPASS_COLLECTION_URL: source.COMPASS_COLLECTION_URL!,
+    TURSO_DATABASE_URL: source.TURSO_DATABASE_URL!,
+    TURSO_AUTH_TOKEN: source.PIPELINE_TURSO_AUTH_TOKEN!,
+    BLOB_READ_WRITE_TOKEN: source.BLOB_READ_WRITE_TOKEN!,
+    REVALIDATE_SECRET: source.REVALIDATE_SECRET!,
+    SHORT_LIST_URL: `https://${source.VERCEL_PROJECT_PRODUCTION_URL}`,
+    // Python buffers stdout when it is not a tty, so without this a crashed
+    // run's logs are lost with the process that was about to print them.
+    PYTHONUNBUFFERED: '1',
+    // Recorded on vision batches and on the pipeline lease, so an operator
+    // can tell which execution home holds something.
+    HOME_SEARCH_HOME: 'sandbox',
+  }
+
+  for (const name of OPTIONAL_VARS) {
+    const value = source[name]
+    if (value) env[name] = value
+  }
+  return env
+}
