@@ -2,6 +2,7 @@ import { Sandbox } from '@vercel/sandbox'
 import { get, put } from '@vercel/blob'
 import { createReapHandler } from '@/lib/pipeline/reap-handler'
 import { SANDBOX_NAME } from '@/lib/pipeline/run-handler'
+import { requireStateStoreId } from '@/lib/pipeline/state-store'
 
 // See the note in ../run/route.ts about `dynamic` under cacheComponents.
 export const maxDuration = 60
@@ -17,9 +18,14 @@ async function getSandbox() {
 }
 
 async function putState(pathname: string, content: Buffer) {
+  // Throws rather than defaulting. Without the id the SDK falls back to
+  // BLOB_READ_WRITE_TOKEN -- the PUBLIC photo store -- and this call would
+  // publish the Compass session. The reaper's caller treats a throw here as
+  // "session not collected", which costs a cold login and nothing else.
+  const storeId = requireStateStoreId(process.env)
   return put(pathname, content, {
     access: 'private',
-    storeId: process.env.STATE_BLOB_STORE_ID,
+    storeId,
     allowOverwrite: true,
     contentType: 'application/json',
   } as never)

@@ -1,6 +1,7 @@
 import { Sandbox } from '@vercel/sandbox'
 import { get } from '@vercel/blob'
 import { createRunHandler } from '@/lib/pipeline/run-handler'
+import { requireStateStoreId } from '@/lib/pipeline/state-store'
 
 // The pipeline outlives any function invocation, so this starts the runner
 // detached and returns. maxDuration only has to cover clone + bootstrap.
@@ -19,11 +20,12 @@ export const maxDuration = 300
  * while score_photos.py runs for hours.
  */
 async function getState(pathname: string): Promise<Buffer | null> {
+  // Resolved OUTSIDE the try. A missing store id must reach the handler's
+  // error path and name itself, not be swallowed as "no session" -- see
+  // lib/pipeline/state-store.ts for what the SDK does otherwise.
+  const storeId = requireStateStoreId(process.env)
   try {
-    const result = await get(pathname, {
-      access: 'private',
-      storeId: process.env.STATE_BLOB_STORE_ID,
-    })
+    const result = await get(pathname, { access: 'private', storeId })
     if (!result || result.statusCode !== 200) return null
     return Buffer.from(await new Response(result.stream).arrayBuffer())
   } catch {
