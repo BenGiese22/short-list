@@ -20,6 +20,16 @@ export const REQUIRED_VARS = [
   'BLOB_READ_WRITE_TOKEN',
   'REVALIDATE_SECRET',
   'VERCEL_PROJECT_PRODUCTION_URL',
+  // Required rather than optional so a run that cannot compute commutes
+  // never starts. Optional would mean finding out three stages in, after
+  // Chromium has scraped the collection and the photos have uploaded, and
+  // the whole run would be discarded anyway.
+  //
+  // The cost of that choice: REQUIRED_VARS is checked for every job, so
+  // until this variable exists in the environment the canary fails too --
+  // for a reason that has nothing to do with what the canary watches. Add
+  // the variable to the project BEFORE deploying this.
+  'MAPBOX_ACCESS_TOKEN',
 ] as const
 
 /** Passed through when present, omitted when not. */
@@ -50,6 +60,10 @@ export function buildRunnerEnv(
     TURSO_AUTH_TOKEN: source.PIPELINE_TURSO_AUTH_TOKEN!,
     BLOB_READ_WRITE_TOKEN: source.BLOB_READ_WRITE_TOKEN!,
     REVALIDATE_SECRET: source.REVALIDATE_SECRET!,
+    // Scoped to Directions and Geocoding only. The commutes stage is the
+    // one consumer; see docs/routing-provider-terms.md in home-search for
+    // why the key being revoked is the failure this system is sized against.
+    MAPBOX_ACCESS_TOKEN: source.MAPBOX_ACCESS_TOKEN!,
     SHORT_LIST_URL: `https://${source.VERCEL_PROJECT_PRODUCTION_URL}`,
     // Python buffers stdout when it is not a tty, so without this a crashed
     // run's logs are lost with the process that was about to print them.

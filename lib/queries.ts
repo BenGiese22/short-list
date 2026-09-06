@@ -82,7 +82,7 @@ export function buildListingsQuery(filter: ListingsFilter): { sql: string; args:
            vs.garage_attached, vs.watermarked_staging_detected,
            vs.suspected_unwatermarked_staging, vs.has_layout_plan,
            vs.layout_plan_clarity_score, vs.photo_score_unavailable,
-           c.denver_minutes,
+           c.medtronic_minutes,
            (SELECT hp.blob_url FROM hosted_photos hp WHERE hp.listing_id = l.listing_id
             ORDER BY hp.position LIMIT 1) AS thumbnail_url
     FROM listings l

@@ -98,9 +98,14 @@ function ListingCard({ listing: l }: { listing: Row }) {
   const pending = l.photo_score_unavailable === 1 || l.photo_score_unavailable === null
   const garageAttached = l.garage_attached as number | null
   const hasIncompleteData = l.has_incomplete_data === 1
-  // Only 68 of 85 listings have commute minutes (geocoding failed for the
-  // rest), so this must render nothing rather than "null min".
-  const commuteMinutes = l.denver_minutes as number | null
+  // The Medtronic (Lafayette) leg, which is the one the score is built on.
+  // This showed denver_minutes until 2026-09-05 -- a different destination
+  // from the one commute_score measures, so sorting by commute reordered the
+  // list by a number the cards did not display.
+  //
+  // Still guarded: a listing whose address will not geocode has no commute
+  // at all, and must render nothing rather than "null min".
+  const commuteMinutes = l.medtronic_minutes as number | null
   const outdoor = l.outdoor_score as number | null
   // Only a real fee earns a pill. Post-backfill ~88% of listings are a definite
   // "None", so printing that on 75 of 85 cards would be noise -- the pill marks
