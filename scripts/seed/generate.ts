@@ -405,7 +405,20 @@ export const EDGE_CASES: readonly EdgeCase[] = [
   },
   {
     label: 'geocode failed',
-    commute: { geocode_failed: 1, denver_minutes: null, denver_miles: null, lat: null, lon: null },
+    // Every figure must go, not just the Denver pair: a failed geocode means
+    // no coordinates, so no leg can have been computed. The list card reads
+    // whichever leg lib/queries.ts selects (medtronic_minutes as of cfa6cc3),
+    // and leaving the other populated renders a commute time for a listing
+    // that has no location -- which is the opposite of what this case is for.
+    commute: {
+      geocode_failed: 1,
+      lat: null,
+      lon: null,
+      denver_miles: null,
+      denver_minutes: null,
+      medtronic_miles: null,
+      medtronic_minutes: null,
+    },
   },
   {
     label: 'fails filters',

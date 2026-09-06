@@ -170,10 +170,32 @@ describe('edge-cases profile', () => {
     expect(data.scores.find((s) => s.listing_id === incomplete)!.has_incomplete_data).toBe(1)
   })
 
-  it('includes a listing whose geocode failed, so denver_minutes is null', () => {
+  // A failed geocode means no coordinates, so NO leg can have been computed.
+  // The list card reads whichever one lib/queries.ts selects, so leaving
+  // either populated renders a commute time for a listing with no location.
+  it('includes a listing whose geocode failed, with every commute figure null', () => {
     const id = caseListing(listings, 'geocode failed').listing_id
     const row = data.commute.find((c) => c.listing_id === id)!
     expect(row.geocode_failed).toBe(1)
+    expect(row.lat).toBeNull()
+    expect(row.lon).toBeNull()
+    expect(row.denver_miles).toBeNull()
     expect(row.denver_minutes).toBeNull()
+    expect(row.medtronic_miles).toBeNull()
+    expect(row.medtronic_minutes).toBeNull()
+  })
+
+  // Holds for every generated row, not just the named edge case, so a future
+  // profile cannot reintroduce the inconsistency.
+  it('never leaves a commute figure on a failed geocode in any profile', () => {
+    for (const profile of ['edge-cases', 'huge'] as const) {
+      for (const row of generate(profile).commute) {
+        if (row.geocode_failed !== 1) continue
+        expect(row.denver_minutes).toBeNull()
+        expect(row.medtronic_minutes).toBeNull()
+        expect(row.denver_miles).toBeNull()
+        expect(row.medtronic_miles).toBeNull()
+      }
+    }
   })
 })
