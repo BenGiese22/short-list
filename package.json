@@ -7,7 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed": "node scripts/seed/index.ts",
+    "dev:docker": "./docker/run.sh dev",
+    "dev:docker:prod": "./docker/run.sh prod",
+    "dev:seed": "./docker/run.sh seed",
+    "dev:shots": "./docker/run.sh shots",
+    "dev:stop": "./docker/run.sh stop",
+    "dev:reset": "./docker/run.sh reset"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

@@ -1,0 +1,40 @@
+# Development image for the short-list viewer.
+#
+# The repo is bind-mounted over /app at run time, so this image exists only to
+# carry a Linux `node_modules` and the entrypoint. That is the point: `git
+# checkout` on the host hot-reloads the container, with no rebuild between a PR
+# branch and main.
+#
+# Rebuild only when package-lock.json changes.
+FROM node:24-slim
+
+# node:24-slim ships a `node` user at uid 1000, which matches the host account
+# this is developed on. Running as that user keeps files the container writes
+# into the bind mount owned by the host user rather than by root.
+ENV NODE_ENV=development
+
+WORKDIR /app
+
+# Dependencies first, so editing source never invalidates this layer.
+COPY --chown=node:node package.json package-lock.json ./
+RUN npm ci
+
+COPY --chown=node:node docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+# /app/.next must exist and be owned by `node` BEFORE it becomes an anonymous
+# volume at run time: docker seeds a new anonymous volume from the image path,
+# and a path that does not exist there yields a root-owned empty volume that
+# `next dev` cannot write to (EACCES on /app/.next/dev).
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && mkdir -p /data /app/.next \
+    && chown -R node:node /data /app
+
+USER node
+
+# /data holds the seeded SQLite file. It is a named volume at run time, so the
+# database survives restarts while `docker volume rm` resets it.
+VOLUME ["/data"]
+
+EXPOSE 3000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]

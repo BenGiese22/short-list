@@ -1,0 +1,13 @@
+# The dev image only needs package.json, package-lock.json and the entrypoint —
+# the repo itself arrives as a bind mount at run time. Keeping the build context
+# small keeps `docker build` fast.
+node_modules
+.next
+.git
+.shots
+.vercel
+*.tsbuildinfo
+npm-debug.log*
+.env
+.env.*
+!docker/env.dev

@@ -1,0 +1,29 @@
+{
+  // The seed and screenshot scripts are excluded from the app's tsconfig,
+  // because `next build` type-checks with it and these are not app code: they
+  // run under plain Node's native TypeScript stripping, which requires the
+  // explicit `.ts` import extensions that `moduleResolution: "bundler"`
+  // rejects.
+  //
+  // Check them with:  npx tsc -p scripts --noEmit
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    // Node strips types rather than resolving a build graph, so imports name
+    // the file that actually exists on disk.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["**/*.ts"],
+  // shots.ts imports playwright, which is deliberately NOT a dependency of
+  // this repo — it lives only in the screenshot image (docker/Dockerfile.shots)
+  // so the everyday dev image does not carry a browser toolchain. There is no
+  // type information for it here, so it is checked when that image builds and
+  // not before.
+  "exclude": ["shots.ts"]
+}
