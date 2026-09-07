@@ -3,9 +3,18 @@
 import { useActionState, useRef, useState, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 import { createShareLink, type ShareLinkState } from './actions'
-import { durationLabel, formatExpiry, type ShareDuration } from '@/lib/share'
+// share-durations, not share: importing a value from lib/share reaches
+// lib/auth and node:crypto, which ships a ~440KB crypto polyfill to the browser.
+import {
+  SHARE_DURATIONS,
+  durationLabel,
+  formatExpiry,
+  type ShareDuration,
+} from '@/lib/share-durations'
 
-const DURATIONS: readonly ShareDuration[] = ['24h', '7d', '30d']
+// Derived rather than retyped, so a fourth duration cannot be added to the
+// allowlist without appearing in the picker.
+const DURATIONS = Object.keys(SHARE_DURATIONS) as ShareDuration[]
 
 /** Never fires: the "store" is whether this is the client, which never changes. */
 const subscribeToNothing = () => () => {}
@@ -25,60 +34,61 @@ const FALLBACK: Record<ShareDuration, string> = {
   '30d': '30 days',
 }
 
-function ShareIcon() {
+/** One <svg> shell; each icon below is just its paths. */
+function Icon({ strokeWidth = 2, children }: { strokeWidth?: number; children: React.ReactNode }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth}
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
-      <path d="M12 15V3" />
-      <path d="M8 7l4-4 4 4" />
+      {children}
     </svg>
   )
 }
 
-function LinkIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
-      <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" />
-    </svg>
-  )
-}
+const ShareIcon = () => (
+  <Icon>
+    <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+    <path d="M12 15V3" />
+    <path d="M8 7l4-4 4 4" />
+  </Icon>
+)
 
-function CopyIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="9" width="11" height="11" rx="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
-    </svg>
-  )
-}
+const LinkIcon = () => (
+  <Icon strokeWidth={1.9}>
+    <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
+    <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" />
+  </Icon>
+)
 
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12.5l5.5 5.5L20 7" />
-    </svg>
-  )
-}
+const CopyIcon = () => (
+  <Icon>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+  </Icon>
+)
+
+const CheckIcon = () => (
+  <Icon strokeWidth={2.4}>
+    <path d="M4 12.5l5.5 5.5L20 7" />
+  </Icon>
+)
 
 export function ShareControl() {
   const [state, formAction, pending] = useActionState(createShareLink, null)
 
   /*
-   * Both flags track the action RESULT BY IDENTITY, not by url.
+   * What happened to WHICH link, held as one fact so the two outcomes cannot
+   * both be live at once.
    *
-   * Two links minted in the same wall-clock second with the same duration are
-   * byte-identical -- signSession hmacs `v1-guest-<expiresAt>-<keyVersion>` and
-   * nothing else varies -- so comparing urls would decide the second link had
-   * already been copied and never show its row. Identity also retires both
-   * flags for free when a new link arrives: neither can outlive its own result.
+   * `for` is the action result BY IDENTITY, not its url: two links minted in
+   * the same wall-clock second with the same duration are byte-identical --
+   * signSession hmacs `v1-guest-<expiresAt>-<keyVersion>` and nothing else
+   * varies -- so comparing urls would decide the second link had already been
+   * copied and never show its row. Identity also retires the feedback for free
+   * when a new link arrives: it cannot outlive the result it describes.
    */
-  const [copiedFor, setCopiedFor] = useState<ShareLinkState>(null)
-  const [failedFor, setFailedFor] = useState<ShareLinkState>(null)
+  const [feedback, setFeedback] = useState<
+    { for: ShareLinkState; kind: 'copied' | 'failed' } | null
+  >(null)
 
   // Re-read whenever the owner reaches for the control. Without this a tab left
   // open past midnight keeps offering yesterday's dates, and the picker
@@ -93,16 +103,10 @@ export function ShareControl() {
   // during the hydration render instead of in a second, cascading one.
   const hydrated = useSyncExternalStore(subscribeToNothing, () => true, () => false)
   const now = new Date(clock)
-  const labels: Record<ShareDuration, string> = hydrated
-    ? {
-        '24h': durationLabel('24h', now),
-        '7d': durationLabel('7d', now),
-        '30d': durationLabel('30d', now),
-      }
-    : FALLBACK
 
   const link = state?.ok === true ? state : null
-  const copied = link !== null && copiedFor === state
+  const outcome = feedback?.for === state ? feedback.kind : null
+  const copied = link !== null && outcome === 'copied'
   const showRow = link !== null && !copied
 
   const statusRef = useRef<HTMLParagraphElement>(null)
@@ -113,17 +117,14 @@ export function ShareControl() {
     } catch {
       // Keep the row. Nothing stores this link, so dismissing it on a failed
       // copy would strand a live guest session no one holds the url for.
-      setFailedFor(state)
+      setFeedback({ for: state, kind: 'failed' })
       return
     }
     // flushSync so the confirmation is in the DOM before focus moves to it:
     // the row holding the just-activated button is about to unmount, and with
     // nowhere deliberate to go focus falls back to document.body, leaving a
     // keyboard user to resume tabbing from the top of the page.
-    flushSync(() => {
-      setFailedFor(null)
-      setCopiedFor(state)
-    })
+    flushSync(() => setFeedback({ for: state, kind: 'copied' }))
     statusRef.current?.focus()
   }
 
@@ -159,7 +160,7 @@ export function ShareControl() {
           >
             {DURATIONS.map((duration) => (
               <option key={duration} value={duration}>
-                {labels[duration]}
+                {hydrated ? durationLabel(duration, now) : FALLBACK[duration]}
               </option>
             ))}
           </select>
@@ -195,8 +196,8 @@ export function ShareControl() {
         </div>
       ) : null}
 
-      {state !== null && failedFor === state ? (
-        <p className="share-error" role="alert">
+      {outcome === 'failed' ? (
+        <p className="enter-error share-error" role="alert">
           Couldn&rsquo;t copy automatically. Select the link above and copy it.
         </p>
       ) : null}

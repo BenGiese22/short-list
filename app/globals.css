@@ -88,11 +88,17 @@
   .search svg{ flex:none; opacity:0.5; width:18px; height:18px; }
   .search input{ border:none; outline:none; background:transparent; color:var(--ink); font-size: 14px; width:100%; font-family: inherit; }
   .search input::placeholder{ color: var(--ink-3); }
-  select.sort{
+  /* The caret and appearance reset are shared with select.share-until; each
+     selector's own block carries only its size and weight. */
+  select.sort, select.share-until{
     appearance:none; -webkit-appearance:none; background: var(--surface); border:1px solid var(--line); color: var(--ink);
-    border-radius: var(--radius-m); padding: 9px 30px 9px 12px; font-size:13px; font-weight:600;
+    font-family: inherit;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23888'/></svg>");
-    background-repeat: no-repeat; background-position: right 10px center;
+    background-repeat: no-repeat;
+  }
+  select.sort{
+    border-radius: var(--radius-m); padding: 9px 30px 9px 12px; font-size:13px; font-weight:600;
+    background-position: right 10px center;
   }
   .chips{ display:flex; gap:6px; flex-wrap:wrap; }
   /* ---------- share (owner only) ----------
@@ -106,12 +112,12 @@
   }
   .share-form{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .share-label{ font-size:11.5px; color: var(--ink-3); }
+  /* Only what differs from select.sort, which carries the shared caret and
+     appearance reset for both. */
   select.share-until{
-    appearance:none; -webkit-appearance:none; background: var(--surface); border:1px solid var(--line);
-    color: var(--ink); border-radius: var(--radius-m); padding:7px 26px 7px 10px;
-    font-size:12px; font-weight:700; font-variant-numeric: tabular-nums; font-family: inherit;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23888'/></svg>");
-    background-repeat: no-repeat; background-position: right 9px center;
+    border-radius: var(--radius-m); padding:7px 26px 7px 10px;
+    font-size:12px; font-weight:700; font-variant-numeric: tabular-nums;
+    background-position: right 9px center;
   }
   .share-create{
     display:inline-flex; align-items:center; gap:6px; background: var(--surface);
@@ -152,13 +158,12 @@
   }
   .share-link-url:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
   .share-link-meta{ margin:0; font-size:11.5px; color: var(--ink-2); font-weight:600; }
-  .share-copy{
-    flex:none; display:inline-flex; align-items:center; gap:6px; background: var(--ink); color: var(--bg);
-    border:none; font-size:12.5px; font-weight:800; padding:8px 13px; border-radius:999px;
-    cursor:pointer; white-space:nowrap;
-  }
-  .share-copy svg{ width:12px; height:12px; }
-  .share-error{ margin:6px 0 0; font-size:11.5px; color: var(--warn); text-align:right; }
+  /* The solid-pill CTA itself is shared with .detail-compass (declared with it,
+     in the detail-view section); this adds only what a <button> needs. */
+  .share-copy{ flex:none; border:none; cursor:pointer; white-space:nowrap; }
+  /* Composed with .enter-error (which this same component already uses for the
+     action's own failure) so warn-coloured message text is defined once. */
+  .share-error{ margin:6px 0 0; text-align:right; }
 
   @media (max-width: 560px){
     /* At this width the bar's own wrap already stacks the picker and button;
@@ -293,8 +298,10 @@
   .detail-topbar{ position: sticky; top:0; z-index: 15; background: var(--bg); border-bottom: 1px solid var(--line); padding: 14px 20px; display:flex; align-items:center; justify-content:space-between; gap: 10px; }
   .back-btn{ background:none; border:none; color: var(--ink); font-size: 13.5px; font-weight:700; display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 4px; }
   .back-btn svg{ width:15px; height:15px; }
-  .detail-compass{ display:inline-flex; align-items:center; gap:6px; background: var(--ink); color: var(--bg); font-size: 12.5px; font-weight:800; padding: 8px 13px; border-radius: 999px; text-decoration:none; }
-  .detail-compass svg{ width:12px; height:12px; }
+  /* One solid-pill CTA, used by the Compass link here and by the share
+     control's Copy button. Restyling it should mean editing one rule. */
+  .detail-compass, .share-copy{ display:inline-flex; align-items:center; gap:6px; background: var(--ink); color: var(--bg); font-size: 12.5px; font-weight:800; padding: 8px 13px; border-radius: 999px; text-decoration:none; }
+  .detail-compass svg, .share-copy svg{ width:12px; height:12px; }
 
   .gallery{ padding: 16px 20px 0; }
   .gallery-main{ position:relative; border-radius: var(--radius-m); overflow:hidden; border:1px solid var(--line); aspect-ratio: 4/3; background: var(--surface-2); }
