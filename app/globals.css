@@ -255,6 +255,30 @@
   .b-pill.staged{ background: var(--warn); color: var(--warn-ink); }
   .b-pill.cutoff{ background: var(--amber); color:#fff; }
   .b-pill.pending{ background: hsl(220 8% 40% / 0.16); color: var(--ink-2); }
+  /* Compass's own market status. Deliberately the loudest pill on the card
+     when it means someone else is already buying -- that is the fact that
+     decides whether the rest of the card is worth reading. */
+  .b-pill.status{ border:1px solid var(--line-strong); color: var(--ink-2); background:none; }
+  .b-pill.status.is-unavailable{ background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+  /* "the vision model never scored this listing's photos" -- named for what
+     it is, after years of being labelled "Pending" and read as market status. */
+  .b-pill.no-photo-score{ background: hsl(220 8% 40% / 0.16); color: var(--ink-2); }
+
+  /* A house under contract stays in the ranking so its position is still
+     visible, but stops competing for attention. Ben, 2026-09-07: "we can
+     still see where it stacks up but we know it's not relevant to our
+     current search." Opacity alone would fail WCAG on the text, so the
+     thumbnail desaturates and the ground shifts instead. */
+  .card-unavailable{ background: var(--surface-2); }
+  .card-unavailable .thumb-wrap img{ filter: grayscale(0.85); opacity: 0.72; }
+  .card-unavailable .card-main{ opacity: 0.82; }
+  .card-unavailable .b-pill.status{ opacity: 1; }
+
+  .detail-status{
+    margin: 0 0 6px; font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--ink-3);
+  }
+  .detail-status.is-unavailable{ color: var(--amber); text-transform: none; letter-spacing: 0; font-size: 13px; }
   .b-pill.garage{ border:1px solid var(--line); color: var(--ink-2); background:none; text-transform:none; font-weight:700; }
   /* A real HOA fee is the exception on this corpus (9 of 85), so it reads as a
      flag rather than a neutral fact -- amber, matching the value chip's
