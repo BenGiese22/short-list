@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import type { InValue } from '@libsql/client'
 import { getDb } from './db'
+import { NOT_AVAILABLE } from './status'
 
 export type SortKey =
   | 'composite' | 'commute' | 'sqft' | 'condition' | 'outdoor' | 'room' | 'parking'
@@ -19,12 +20,21 @@ const SORT_COLUMNS = new Map<Exclude<SortKey, 'value' | 'price'>, string>([
   ['parking', 's.parking_score'],
 ])
 
+/** Which slice of the corpus to show. `undefined` means all of it.
+ *
+ *  Replaces three chips that were each near-useless: "Passes cutoffs" was two
+ *  undocumented numbers matching 92 of 99; "Staging flagged" matched 46 of 99,
+ *  which is a coin flip rather than a signal; and "Not yet scored" meant "no
+ *  VISION score", so listings with composites of 71 and 67 appeared under it.
+ *
+ *  What replaces them is the question actually worth asking of a house: can we
+ *  still buy it. Four of the current top thirteen are already under contract. */
+export type AvailabilityFilter = 'available' | 'unavailable'
+
 export interface ListingsFilter {
   search?: string
   sort?: SortKey
-  onlyPasses?: boolean
-  onlyStaging?: boolean
-  onlyPending?: boolean
+  availability?: AvailabilityFilter
 }
 
 export function buildListingsQuery(filter: ListingsFilter): { sql: string; args: InValue[] } {
@@ -35,14 +45,15 @@ export function buildListingsQuery(filter: ListingsFilter): { sql: string; args:
     clauses.push('(l.address LIKE ? OR l.city LIKE ?)')
     args.push(`%${filter.search}%`, `%${filter.search}%`)
   }
-  if (filter.onlyPasses) {
-    clauses.push('s.passes_filters = 1')
-  }
-  if (filter.onlyStaging) {
-    clauses.push('(vs.watermarked_staging_detected = 1 OR vs.suspected_unwatermarked_staging = 1)')
-  }
-  if (filter.onlyPending) {
-    clauses.push('(vs.listing_id IS NULL OR vs.photo_score_unavailable = 1)')
+  if (filter.availability) {
+    // The same vocabulary `availability()` uses for the card badge, from one
+    // definition rather than two. A TS helper and a SQL IN clause drifting
+    // apart is precisely how the badge and the filter would come to disagree
+    // about the same house.
+    const placeholders = NOT_AVAILABLE.map(() => '?').join(', ')
+    const test = filter.availability === 'unavailable' ? 'IN' : 'NOT IN'
+    clauses.push(`LOWER(TRIM(COALESCE(l.localized_status, ''))) ${test} (${placeholders})`)
+    args.push(...NOT_AVAILABLE)
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''

@@ -9,7 +9,7 @@ async function seed(db: Client) {
     lot_sqft INTEGER, parking_spaces INTEGER, year_built INTEGER, description TEXT,
     listing_url TEXT, is_pinned INTEGER, hoa_annual REAL,
     tax_annual REAL, sqft_above_grade INTEGER, sqft_below_grade INTEGER,
-    outdoor_spaces TEXT
+    outdoor_spaces TEXT, localized_status TEXT
   )`)
   await db.execute(`CREATE TABLE scores (
     listing_id TEXT PRIMARY KEY, commute_score REAL, sqft_score REAL,
@@ -33,13 +33,13 @@ async function seed(db: Client) {
   )`)
 
   await db.execute(
-    "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0, 0, 3160, 1404, 360, '[\"Deck\",\"Patio\"]')"
+    "INSERT INTO listings VALUES ('a', '1 Main St', 'Arvada', 'CO', '80002', '$600,000', 600000, 4, 3, 2000, 7000, 2, 2000, 'desc', 'https://compass.com/a', 0, 0, 3160, 1404, 360, '[\"Deck\",\"Patio\"]', 'Active')"
   )
   await db.execute(
     "INSERT INTO scores VALUES ('a', 80, 70, 90, 60, 75, 100, 52.5, 79, 1, 0, 't')"
   )
   await db.execute(
-    "INSERT INTO listings VALUES ('b', '2 Oak Ave', 'Broomfield', 'CO', '80020', '$500,000', 500000, 3, 2, 1500, 6500, 1, 1990, 'desc', 'https://compass.com/b', 0, NULL, NULL, NULL, NULL, NULL)"
+    "INSERT INTO listings VALUES ('b', '2 Oak Ave', 'Broomfield', 'CO', '80020', '$500,000', 500000, 3, 2, 1500, 6500, 1, 1990, 'desc', 'https://compass.com/b', 0, NULL, NULL, NULL, NULL, NULL, 'Pending')"
   )
   await db.execute(
     "INSERT INTO scores VALUES ('b', 60, 50, 40, 90, 50, 90, 50, 55, 0, 1, 't')"
@@ -95,16 +95,38 @@ describe('buildListingsQuery', () => {
     expect(result.rows.map((r) => r.listing_id)).toEqual(['a', 'b'])
   })
 
-  it('filters to only listings that pass cutoffs', async () => {
-    const { sql, args } = buildListingsQuery({ onlyPasses: true })
+  it('filters to houses we can still buy', async () => {
+    const { sql, args } = buildListingsQuery({ availability: 'available' })
     const result = await db.execute({ sql, args })
     expect(result.rows.map((r) => r.listing_id)).toEqual(['a'])
   })
 
-  it('filters to only staging-flagged listings', async () => {
-    const { sql, args } = buildListingsQuery({ onlyStaging: true })
+  it('filters to the ones already under contract', async () => {
+    const { sql, args } = buildListingsQuery({ availability: 'unavailable' })
     const result = await db.execute({ sql, args })
     expect(result.rows.map((r) => r.listing_id)).toEqual(['b'])
+  })
+
+  it('shows everything when no availability is asked for', async () => {
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('does not hide a listing whose status we failed to read', async () => {
+    // Hiding a house because we could not parse its status is the wrong
+    // error to make -- a missing status is not evidence it has sold.
+    await db.execute("UPDATE listings SET localized_status = NULL WHERE listing_id = 'b'")
+    const { sql, args } = buildListingsQuery({ availability: 'available' })
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('matches the status however Compass cased or padded it', async () => {
+    await db.execute("UPDATE listings SET localized_status = '  PENDING ' WHERE listing_id = 'b'")
+    const { sql, args } = buildListingsQuery({ availability: 'available' })
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id)).toEqual(['a'])
   })
 
   it('includes a thumbnail_url from the first hosted photo, or null when none exist', async () => {

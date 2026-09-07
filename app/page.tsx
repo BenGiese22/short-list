@@ -53,9 +53,10 @@ async function ListingCards({
   const listings = await getListings({
     search: params.search,
     sort: params.sort as SortKey | undefined,
-    onlyPasses: params.onlyPasses === '1',
-    onlyStaging: params.onlyStaging === '1',
-    onlyPending: params.onlyPending === '1',
+    availability:
+      params.availability === 'available' || params.availability === 'unavailable'
+        ? params.availability
+        : undefined,
   })
 
   if (listings.length === 0) {

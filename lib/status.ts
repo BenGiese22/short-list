@@ -13,7 +13,9 @@ export type Availability = 'available' | 'unavailable' | 'unknown'
  *  fall through, so these stay in the ranking -- de-emphasised, not hidden.
  *  Ben, 2026-09-07: "we can still see where it stacks up but we know it's not
  *  relevant to our current search." */
-const NOT_AVAILABLE = new Set(['pending', 'closed', 'sold', 'under contract'])
+export const NOT_AVAILABLE = ['pending', 'closed', 'sold', 'under contract'] as const
+
+const NOT_AVAILABLE_SET: ReadonlySet<string> = new Set(NOT_AVAILABLE)
 
 /** Shown as-is when present. Compass writes these in title case already. */
 export function statusLabel(status: unknown): string | null {
@@ -24,7 +26,7 @@ export function statusLabel(status: unknown): string | null {
 export function availability(status: unknown): Availability {
   const text = typeof status === 'string' ? status.trim().toLowerCase() : ''
   if (!text) return 'unknown'
-  if (NOT_AVAILABLE.has(text)) return 'unavailable'
+  if (NOT_AVAILABLE_SET.has(text)) return 'unavailable'
   // "Active / Backup" is accepting backup offers: still gettable, and the
   // slash form means a substring check would be wrong to treat it as closed.
   return 'available'
@@ -36,13 +38,7 @@ export function availability(status: unknown): Availability {
  *  are what make the list the list; anything else in the URL is somebody
  *  else's parameter and must not come back on the return trip.
  */
-export const LIST_STATE_KEYS = [
-  'search',
-  'sort',
-  'onlyPasses',
-  'onlyStaging',
-  'onlyPending',
-] as const
+export const LIST_STATE_KEYS = ['search', 'sort', 'availability'] as const
 
 export function listStateParams(params: Record<string, string | undefined>): string {
   const out = new URLSearchParams()
