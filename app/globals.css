@@ -127,6 +127,10 @@
     flex-basis:100%; margin:0; display:flex; justify-content:flex-end; align-items:center; gap:6px;
     font-size:11.5px; font-weight:700; color: var(--ink-2);
   }
+  /* The element is always in the DOM so the live region can announce; it only
+     takes space once it has something to say. */
+  .share-copied:empty{ display:none; }
+  .share-copied:focus{ outline:none; }
   .share-copied svg{ width:12px; height:12px; color: var(--accent); flex:none; }
 
   /* The created link, in the list's own row anatomy: it is the one bold
@@ -162,10 +166,14 @@
     .share-bar{ justify-content:flex-start; }
     .share-copied{ justify-content:flex-start; }
     .share-error{ text-align:left; }
+    /* Wraps without `order`. Reordering visually while leaving the DOM alone
+       would put the url field (below) ahead of the Copy button (above) in the
+       tab sequence -- WCAG 2.4.3. Letting it wrap in source order keeps the
+       two the same: icon and url on the first line, button on the second.
+       58px is the icon (44) plus the row gap (14). */
     .share-link{ flex-wrap:wrap; }
-    .share-link-main{ flex-basis:100%; order:1; }
-    .share-link-icon{ order:0; }
-    .share-copy{ order:0; margin-left:auto; }
+    .share-link-main{ flex-basis: calc(100% - 58px); }
+    .share-copy{ margin-left:auto; }
   }
   .chip{ border:1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12px; font-weight:600; padding: 6px 11px; border-radius: 999px; cursor:pointer; letter-spacing:0.01em; white-space:nowrap; }
   .chip[aria-pressed="true"]{ background: var(--ink); color: var(--bg); border-color: var(--ink); }

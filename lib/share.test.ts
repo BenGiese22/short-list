@@ -161,7 +161,10 @@ describe('share', () => {
  * while still reading in the viewer's own timezone.
  */
 describe('durationLabel', () => {
-  // A Saturday, so the weekday is not the same as the one the expiry lands on.
+  // A Sunday. The 24h and 30d cases below land on a different weekday, so an
+  // implementation that read now.getDay() instead of the expiry's would fail
+  // them; the 7d case cannot distinguish the two, since any 7-day offset
+  // necessarily lands on the same weekday it started from.
   const now = new Date(2026, 8, 6, 15, 4)
 
   it('names the day a 24-hour link stops working', () => {

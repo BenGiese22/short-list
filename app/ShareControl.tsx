@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useState, useSyncExternalStore } from 'react'
-import { createShareLink } from './actions'
+import { useActionState, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
+import { createShareLink, type ShareLinkState } from './actions'
 import { durationLabel, formatExpiry, type ShareDuration } from '@/lib/share'
 
 const DURATIONS: readonly ShareDuration[] = ['24h', '7d', '30d']
@@ -10,13 +11,13 @@ const DURATIONS: readonly ShareDuration[] = ['24h', '7d', '30d']
 const subscribeToNothing = () => () => {}
 
 /**
- * Shown until the real dates are known.
+ * Shown in the server-rendered markup only.
  *
  * The picker names the day a link stops working rather than a length of time,
  * because every other number on this page is a concrete fact and an owner
  * should know the answer to "when does this die?" BEFORE minting a link, not
  * after. That date depends on the viewer's clock and timezone, which the server
- * does not have, so these stand in for the server-rendered markup only.
+ * does not have, so these stand in until hydration.
  */
 const FALLBACK: Record<ShareDuration, string> = {
   '24h': '24 hours',
@@ -67,55 +68,88 @@ function CheckIcon() {
 export function ShareControl() {
   const [state, formAction, pending] = useActionState(createShareLink, null)
 
-  // The url that was successfully copied, and the expiry to name in the
-  // confirmation. Keyed on the url rather than a boolean so minting a SECOND
-  // link brings its row back without needing an effect to reset anything.
-  const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
-  const [copiedExpiry, setCopiedExpiry] = useState<string | null>(null)
-  const [copyFailed, setCopyFailed] = useState(false)
+  /*
+   * Both flags track the action RESULT BY IDENTITY, not by url.
+   *
+   * Two links minted in the same wall-clock second with the same duration are
+   * byte-identical -- signSession hmacs `v1-guest-<expiresAt>-<keyVersion>` and
+   * nothing else varies -- so comparing urls would decide the second link had
+   * already been copied and never show its row. Identity also retires both
+   * flags for free when a new link arrives: neither can outlive its own result.
+   */
+  const [copiedFor, setCopiedFor] = useState<ShareLinkState>(null)
+  const [failedFor, setFailedFor] = useState<ShareLinkState>(null)
+
+  // Re-read whenever the owner reaches for the control. Without this a tab left
+  // open past midnight keeps offering yesterday's dates, and the picker
+  // promises a day the server will not mint -- which is the whole point of
+  // naming a date instead of a duration.
+  const [clock, setClock] = useState(() => Date.now())
+  const readClock = () => setClock(Date.now())
 
   // The dates depend on the viewer's clock and timezone, which the server does
   // not have. useSyncExternalStore rather than an effect: it reads false while
   // rendering on the server and true on the client, so the labels resolve
   // during the hydration render instead of in a second, cascading one.
   const hydrated = useSyncExternalStore(subscribeToNothing, () => true, () => false)
+  const now = new Date(clock)
   const labels: Record<ShareDuration, string> = hydrated
     ? {
-        '24h': durationLabel('24h', new Date()),
-        '7d': durationLabel('7d', new Date()),
-        '30d': durationLabel('30d', new Date()),
+        '24h': durationLabel('24h', now),
+        '7d': durationLabel('7d', now),
+        '30d': durationLabel('30d', now),
       }
     : FALLBACK
 
   const link = state?.ok === true ? state : null
-  const showRow = link !== null && link.url !== copiedUrl
-  const showCopied = link !== null && link.url === copiedUrl && copiedExpiry !== null
+  const copied = link !== null && copiedFor === state
+  const showRow = link !== null && !copied
 
-  async function copy(url: string, expiresAt: number) {
+  const statusRef = useRef<HTMLParagraphElement>(null)
+
+  async function copy(url: string) {
     try {
       await navigator.clipboard.writeText(url)
     } catch {
       // Keep the row. Nothing stores this link, so dismissing it on a failed
       // copy would strand a live guest session no one holds the url for.
-      setCopyFailed(true)
+      setFailedFor(state)
       return
     }
-    setCopyFailed(false)
-    setCopiedExpiry(formatExpiry(expiresAt))
-    setCopiedUrl(url)
+    // flushSync so the confirmation is in the DOM before focus moves to it:
+    // the row holding the just-activated button is about to unmount, and with
+    // nowhere deliberate to go focus falls back to document.body, leaving a
+    // keyboard user to resume tabbing from the top of the page.
+    flushSync(() => {
+      setFailedFor(null)
+      setCopiedFor(state)
+    })
+    statusRef.current?.focus()
   }
 
   return (
     <>
       <div className="share-bar">
-        {showCopied ? (
-          <p className="share-copied" role="status">
-            <CheckIcon />
-            Link copied · open until {copiedExpiry}
-          </p>
-        ) : null}
+        {/*
+          Always rendered rather than inserted on copy: a polite live region has
+          to be in the DOM before its text changes or screen readers skip the
+          announcement. `.share-copied:empty` hides it while idle.
+        */}
+        <p className="share-copied" role="status" tabIndex={-1} ref={statusRef}>
+          {copied ? (
+            <>
+              <CheckIcon />
+              Link copied · open until {formatExpiry(link.expiresAt)}
+            </>
+          ) : null}
+        </p>
 
-        <form action={formAction} className="share-form">
+        <form
+          action={formAction}
+          className="share-form"
+          onPointerDown={readClock}
+          onFocus={readClock}
+        >
           <label className="share-label" htmlFor="share-duration">Guests can view until</label>
           <select
             id="share-duration"
@@ -154,14 +188,14 @@ export function ShareControl() {
               Open until {formatExpiry(link.expiresAt)} · anyone with the link can view
             </p>
           </div>
-          <button type="button" className="share-copy" onClick={() => copy(link.url, link.expiresAt)}>
+          <button type="button" className="share-copy" onClick={() => copy(link.url)}>
             <CopyIcon />
             Copy link
           </button>
         </div>
       ) : null}
 
-      {copyFailed ? (
+      {state !== null && failedFor === state ? (
         <p className="share-error" role="alert">
           Couldn&rsquo;t copy automatically. Select the link above and copy it.
         </p>
