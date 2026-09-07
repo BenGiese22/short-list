@@ -5,6 +5,7 @@ import { getListing } from '@/lib/queries'
 import { Gallery } from './Gallery'
 import { basementFact, fmtMoney, monthlyCostLine, propertyTaxFact } from '@/lib/facts'
 import { availability, listHref, listStateParams, statusLabel } from '@/lib/status'
+import { RejectTool } from '@/app/RejectTool'
 
 // getListing() returns the spread of a libsql `Row` (a `[name: string]: Value`
 // index-signature object) plus `amenities`/`photos`. TypeScript's inference of
@@ -376,6 +377,9 @@ function ListingDetailBody({ listing: l, backHref }: { listing: Listing; backHre
           Open full listing on Compass ↗
         </a>
       </div>
+          <Suspense fallback={null}>
+        <RejectTool listingId={l.listing_id as string} address={l.address as string} />
+      </Suspense>
     </>
   )
 }
