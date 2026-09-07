@@ -31,7 +31,11 @@ function PasscodeForm({ next, error }: { next: string; error?: string }) {
       <h1>The Short List</h1>
       <label htmlFor="passcode">Passcode</label>
       <input id="passcode" name="passcode" type="password" autoFocus required />
-      {error && <p className="enter-error">Wrong passcode — try again.</p>}
+      {error === 'link' ? (
+        <p className="enter-error">That share link is invalid or has expired — ask for a new one.</p>
+      ) : error ? (
+        <p className="enter-error">Wrong passcode — try again.</p>
+      ) : null}
       <button type="submit">Enter</button>
     </form>
   )

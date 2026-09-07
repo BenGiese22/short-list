@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { SESSION_COOKIE, signSession, safeNext } from '../../lib/auth'
+import { OWNER_SESSION_SECONDS, issueSession, nowSeconds, safeNext } from '../../lib/auth'
 
 export async function submitPasscode(formData: FormData) {
   const passcode = formData.get('passcode')
@@ -13,12 +13,7 @@ export async function submitPasscode(formData: FormData) {
   }
 
   const jar = await cookies()
-  jar.set(SESSION_COOKIE, signSession(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 90,
-    path: '/',
-  })
+  const session = issueSession({ role: 'owner', expiresAt: nowSeconds() + OWNER_SESSION_SECONDS })
+  jar.set(session.name, session.value, session.options)
   redirect(next)
 }

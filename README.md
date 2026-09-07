@@ -15,7 +15,8 @@ Copy `.env.example` to `.env.local` and fill in:
 | `TURSO_DATABASE_URL` | Turso database URL the app reads from. |
 | `TURSO_AUTH_TOKEN` | Turso auth token. Use the **read-only** token here — `publish.py` uses a separate read-write token to sync data. |
 | `SITE_PASSCODE` | Passcode required to enter the site. |
-| `COOKIE_SECRET` | Secret used to sign the session cookie issued after a correct passcode. |
+| `COOKIE_SECRET` | Secret used to sign the session cookie issued after a correct passcode, and every share link. |
+| `SHARE_KEY_VERSION` | Optional, default `1`. Bump to invalidate every outstanding share link (also logs owners out once). |
 | `REVALIDATE_SECRET` | Shared secret `publish.py` sends to `/api/revalidate` after a sync, so the viewer picks up fresh data without waiting for cache expiry. |
 
 ## Running locally
