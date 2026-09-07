@@ -23,6 +23,54 @@ export function shareOrigin(headers: Headers): string | null {
   return `${proto}://${host}`
 }
 
+/**
+ * Date labels for the share control, formatted by hand rather than through
+ * toLocaleString.
+ *
+ * Two reasons. The control must read the same in every environment -- the dev
+ * container runs UTC while the browser does not, and an ICU-dependent format
+ * cannot be pinned in a unit test without also pinning a timezone, which would
+ * stop it reflecting the viewer's own clock. And the app is English-only, the
+ * same call `lib/facts.ts` already makes for money.
+ *
+ * Every reader below is a LOCAL-time getter, so the label is the viewer's
+ * wall clock while staying deterministic for a given Date.
+ */
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const
+
+/** "Sun 13 Sep" -- no zero-padding on the day, matching how a person says it. */
+function dayLabel(date: Date): string {
+  return `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`
+}
+
+/**
+ * The day a link of this duration stops working, for the picker.
+ *
+ * Date arithmetic in milliseconds rather than by incrementing the day, so a
+ * 30-day link crossing a month or year boundary lands correctly.
+ */
+export function durationLabel(duration: ShareDuration, now: Date): string {
+  return dayLabel(new Date(now.getTime() + SHARE_DURATIONS[duration] * 1000))
+}
+
+/**
+ * "Sun 13 Sep, 3:04 PM" from the unix seconds `buildShareLink` returns.
+ *
+ * 12-hour, because that is how the times in this app get spoken aloud. Hour 0
+ * and hour 12 both map to 12, which is the pair a `% 12` alone gets wrong.
+ */
+export function formatExpiry(expiresAt: number): string {
+  const date = new Date(expiresAt * 1000)
+  const hours = date.getHours()
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${dayLabel(date)}, ${hour12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`
+}
+
 export type ShareLinkResult =
   | { ok: true; url: string; expiresAt: number }
   | { ok: false; message: string }

@@ -95,12 +95,78 @@
     background-repeat: no-repeat; background-position: right 10px center;
   }
   .chips{ display:flex; gap:6px; flex-wrap:wrap; }
-  .share{ display:flex; flex-direction:column; gap:8px; }
-  .share-form{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .share-label{ font-size:12px; font-weight:700; color: var(--ink-2); }
-  .share-result{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .share-url{ flex:1; min-width:200px; border:1px solid var(--line); border-radius: var(--radius-m); padding:7px 10px; font-size:12.5px; font-family: var(--font-geist-mono), monospace; color: var(--ink); background: var(--surface); }
-  .share-expiry{ font-size:12px; color: var(--ink-3); }
+  /* ---------- share (owner only) ----------
+     Deliberately NOT built from .chip and select.sort. Those are the filter
+     vocabulary, and a control that emits a live url into the world should not
+     look like one more way to reorder the list. Hairline rule, right
+     alignment and a squared button separate it instead. */
+  .share-bar{
+    display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap;
+    border-top:1px solid var(--line); margin-top:2px; padding-top:10px;
+  }
+  .share-form{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .share-label{ font-size:11.5px; color: var(--ink-3); }
+  select.share-until{
+    appearance:none; -webkit-appearance:none; background: var(--surface); border:1px solid var(--line);
+    color: var(--ink); border-radius: var(--radius-m); padding:7px 26px 7px 10px;
+    font-size:12px; font-weight:700; font-variant-numeric: tabular-nums; font-family: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23888'/></svg>");
+    background-repeat: no-repeat; background-position: right 9px center;
+  }
+  .share-create{
+    display:inline-flex; align-items:center; gap:6px; background: var(--surface);
+    border:1px solid var(--line-strong); color: var(--ink); font-size:12px; font-weight:800;
+    padding:7px 13px; border-radius: var(--radius-m); cursor:pointer; white-space:nowrap;
+  }
+  .share-create:disabled{ opacity:0.55; cursor:default; }
+  .share-create svg{ width:12px; height:12px; }
+
+  /* Its own line: the confirmation names an expiry, and so does the picker
+     beside it -- two different dates touching read as a contradiction. */
+  .share-copied{
+    flex-basis:100%; margin:0; display:flex; justify-content:flex-end; align-items:center; gap:6px;
+    font-size:11.5px; font-weight:700; color: var(--ink-2);
+  }
+  .share-copied svg{ width:12px; height:12px; color: var(--accent); flex:none; }
+
+  /* The created link, in the list's own row anatomy: it is the one bold
+     object on the page until it is copied away. */
+  .share-link{
+    display:flex; align-items:center; gap:14px; padding:12px 4px;
+    border-top:1px solid var(--line); margin-top:10px;
+  }
+  .share-link-icon{
+    flex:none; width:44px; height:44px; border-radius: var(--radius-m); border:1px solid var(--line);
+    background: var(--surface); display:flex; align-items:center; justify-content:center;
+  }
+  .share-link-icon svg{ width:19px; height:19px; color: var(--accent); }
+  .share-link-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .share-link-url{
+    width:100%; border:none; background:transparent; padding:0; color: var(--ink);
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size:13.5px; letter-spacing:-0.01em; text-overflow: ellipsis;
+  }
+  .share-link-url:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
+  .share-link-meta{ margin:0; font-size:11.5px; color: var(--ink-2); font-weight:600; }
+  .share-copy{
+    flex:none; display:inline-flex; align-items:center; gap:6px; background: var(--ink); color: var(--bg);
+    border:none; font-size:12.5px; font-weight:800; padding:8px 13px; border-radius:999px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .share-copy svg{ width:12px; height:12px; }
+  .share-error{ margin:6px 0 0; font-size:11.5px; color: var(--warn); text-align:right; }
+
+  @media (max-width: 560px){
+    /* At this width the bar's own wrap already stacks the picker and button;
+       left-align so they do not drift to the right edge on their own line. */
+    .share-bar{ justify-content:flex-start; }
+    .share-copied{ justify-content:flex-start; }
+    .share-error{ text-align:left; }
+    .share-link{ flex-wrap:wrap; }
+    .share-link-main{ flex-basis:100%; order:1; }
+    .share-link-icon{ order:0; }
+    .share-copy{ order:0; margin-left:auto; }
+  }
   .chip{ border:1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12px; font-weight:600; padding: 6px 11px; border-radius: 999px; cursor:pointer; letter-spacing:0.01em; white-space:nowrap; }
   .chip[aria-pressed="true"]{ background: var(--ink); color: var(--bg); border-color: var(--ink); }
   .chip.warn-chip[aria-pressed="true"]{ background: var(--warn); border-color: var(--warn); color: var(--warn-ink); }

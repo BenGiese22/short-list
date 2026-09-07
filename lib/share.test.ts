@@ -6,6 +6,8 @@ import {
   shareOrigin,
   buildShareLink,
   resolveShareVisit,
+  formatExpiry,
+  durationLabel,
 } from './share'
 
 const NOW = 1_760_000_000
@@ -146,5 +148,62 @@ describe('share', () => {
       // out owner sessions. Owner sessions are minted only by the passcode.
       expect(resolveShareVisit({ token: owner(), existingCookie: undefined, now: NOW })).toEqual({ kind: 'reject' })
     })
+  })
+})
+
+
+/**
+ * Date labels for the share control.
+ *
+ * Formatted by hand rather than through toLocaleString: the control has to say
+ * the same thing in every environment (the dev container runs UTC, the browser
+ * does not), and a label built from local-time getters is deterministic to test
+ * while still reading in the viewer's own timezone.
+ */
+describe('durationLabel', () => {
+  // A Saturday, so the weekday is not the same as the one the expiry lands on.
+  const now = new Date(2026, 8, 6, 15, 4)
+
+  it('names the day a 24-hour link stops working', () => {
+    expect(durationLabel('24h', now)).toBe('Mon 7 Sep')
+  })
+
+  it('names the day a 7-day link stops working', () => {
+    expect(durationLabel('7d', now)).toBe('Sun 13 Sep')
+  })
+
+  // Crosses a month boundary, which is where naive day arithmetic breaks.
+  it('names the day a 30-day link stops working', () => {
+    expect(durationLabel('30d', now)).toBe('Tue 6 Oct')
+  })
+
+  it('crosses a year boundary', () => {
+    expect(durationLabel('30d', new Date(2026, 11, 20, 9, 0))).toBe('Tue 19 Jan')
+  })
+})
+
+describe('formatExpiry', () => {
+  const at = (y: number, m: number, d: number, h: number, min: number) =>
+    Math.floor(new Date(y, m, d, h, min).getTime() / 1000)
+
+  it('reads as a date and a wall-clock time', () => {
+    expect(formatExpiry(at(2026, 8, 13, 15, 4))).toBe('Sun 13 Sep, 3:04 PM')
+  })
+
+  it('pads the minutes', () => {
+    expect(formatExpiry(at(2026, 8, 13, 9, 5))).toBe('Sun 13 Sep, 9:05 AM')
+  })
+
+  // 0 and 12 are where 24-to-12 hour conversion goes wrong.
+  it('calls midnight 12 AM', () => {
+    expect(formatExpiry(at(2026, 8, 13, 0, 0))).toBe('Sun 13 Sep, 12:00 AM')
+  })
+
+  it('calls noon 12 PM', () => {
+    expect(formatExpiry(at(2026, 8, 13, 12, 0))).toBe('Sun 13 Sep, 12:00 PM')
+  })
+
+  it('does not pad the day of the month', () => {
+    expect(formatExpiry(at(2026, 8, 3, 8, 30))).toBe('Thu 3 Sep, 8:30 AM')
   })
 })
