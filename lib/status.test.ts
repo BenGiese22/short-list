@@ -37,7 +37,7 @@ describe('availability', () => {
 describe('listStateParams', () => {
   it('carries only the keys that shape the list', () => {
     const out = listStateParams({
-      sort: 'value', search: 'Arvada', onlyPasses: '1',
+      sort: 'value', search: 'Arvada', availability: 'available',
       // Not list state. A detail-page parameter has no business coming back
       // on the return trip.
       utm_source: 'email', id: '123',
@@ -45,7 +45,7 @@ describe('listStateParams', () => {
     const params = new URLSearchParams(out)
     expect(params.get('sort')).toBe('value')
     expect(params.get('search')).toBe('Arvada')
-    expect(params.get('onlyPasses')).toBe('1')
+    expect(params.get('availability')).toBe('available')
     expect(params.has('utm_source')).toBe(false)
     expect(params.has('id')).toBe(false)
   })

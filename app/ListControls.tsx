@@ -42,20 +42,20 @@ export function ListControls() {
     }, SEARCH_DEBOUNCE_MS)
   }
 
-  const activeFilter =
-    searchParams.get('onlyPasses') === '1' ? 'passes'
-    : searchParams.get('onlyStaging') === '1' ? 'staging'
-    : searchParams.get('onlyPending') === '1' ? 'pending'
-    : 'all'
+  // One axis: can we still buy it. The three chips this replaces were each
+  // near-useless -- "Passes cutoffs" was two undocumented numbers matching 92
+  // of 99, "Staging flagged" matched 46 of 99, and "Not yet scored" meant "no
+  // VISION score" so listings with composites of 71 and 67 appeared under it.
+  //
+  // `all` stays the default. A house under contract keeps its place in the
+  // ranking, de-emphasised -- deals fall through, and hiding one by default
+  // would lose the answer to "where did it stack up".
+  const activeFilter = searchParams.get('availability') ?? 'all'
 
-  function setFilter(next: 'all' | 'passes' | 'staging' | 'pending') {
+  function setFilter(next: 'all' | 'available' | 'unavailable') {
     const params = new URLSearchParams(searchParams.toString())
-    params.delete('onlyPasses')
-    params.delete('onlyStaging')
-    params.delete('onlyPending')
-    if (next === 'passes') params.set('onlyPasses', '1')
-    if (next === 'staging') params.set('onlyStaging', '1')
-    if (next === 'pending') params.set('onlyPending', '1')
+    if (next === 'all') params.delete('availability')
+    else params.set('availability', next)
     startTransition(() => router.push(`/?${params.toString()}`))
   }
 
@@ -86,9 +86,8 @@ export function ListControls() {
       </div>
       <div className="chips">
         <button type="button" className="chip" aria-pressed={activeFilter === 'all'} onClick={() => setFilter('all')}>All</button>
-        <button type="button" className="chip" aria-pressed={activeFilter === 'passes'} onClick={() => setFilter('passes')}>Passes cutoffs</button>
-        <button type="button" className="chip warn-chip" aria-pressed={activeFilter === 'staging'} onClick={() => setFilter('staging')}>Staging flagged</button>
-        <button type="button" className="chip" aria-pressed={activeFilter === 'pending'} onClick={() => setFilter('pending')}>Not yet scored</button>
+        <button type="button" className="chip" aria-pressed={activeFilter === 'available'} onClick={() => setFilter('available')}>Available</button>
+        <button type="button" className="chip" aria-pressed={activeFilter === 'unavailable'} onClick={() => setFilter('unavailable')}>Under contract</button>
       </div>
     </div>
   )

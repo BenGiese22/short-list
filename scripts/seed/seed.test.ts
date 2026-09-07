@@ -55,8 +55,7 @@ describe.each(GENERATED)('the %s profile', (profile) => {
 
   it('satisfies every filter combination', async () => {
     const filters = [
-      {}, { onlyPasses: true }, { onlyStaging: true }, { onlyPending: true },
-      { onlyPasses: true, onlyStaging: true, onlyPending: true },
+      {}, { availability: 'available' as const }, { availability: 'unavailable' as const },
       { search: 'Ranch' },
     ]
     for (const filter of filters) {
@@ -118,18 +117,21 @@ describe('the edge-cases profile in detail', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('returns only passing listings when onlyPasses is set', async () => {
-    const rows = (await db.execute(buildListingsQuery({ onlyPasses: true }))).rows
+  // The three chips these tests covered were replaced by one availability
+  // axis: "Passes cutoffs" matched 92 of 99 real listings, "Staging flagged"
+  // 46 of 99, and "Not yet scored" meant "no VISION score" so listings with
+  // real composites appeared under it. The generator's STATUSES pool carries
+  // both Active and Pending, so the fixture still exercises both sides.
+  it('returns only buyable listings when availability is available', async () => {
+    const rows = (await db.execute(buildListingsQuery({ availability: 'available' }))).rows
     expect(rows.length).toBeGreaterThan(0)
-    for (const row of rows) expect(row.passes_filters).toBe(1)
+    for (const row of rows) expect(row.localized_status).not.toBe('Pending')
   })
 
-  // onlyPending is "no visual_scores row at all, OR scoring unavailable" --
-  // both halves need a listing behind them.
-  it('returns both pending shapes when onlyPending is set', async () => {
-    const rows = (await db.execute(buildListingsQuery({ onlyPending: true }))).rows
-    expect(rows.some((r) => r.photo_score_unavailable === 1)).toBe(true)
-    expect(rows.some((r) => r.photo_score_unavailable === null)).toBe(true)
+  it('returns only listings under contract when availability is unavailable', async () => {
+    const rows = (await db.execute(buildListingsQuery({ availability: 'unavailable' }))).rows
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) expect(row.localized_status).toBe('Pending')
   })
 })
 
