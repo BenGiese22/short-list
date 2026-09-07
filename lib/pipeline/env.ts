@@ -39,6 +39,19 @@ const OPTIONAL_VARS = [
   'ANTHROPIC_API_KEY',
   'NTFY_TOPIC',
   'MAX_PHOTOS_PER_LISTING',
+  // The change digest and failure alerts. Optional, not required: a run that
+  // cannot send an email is still a run worth having, and the pipeline
+  // treats an unset key as "no email" rather than an error. That is the
+  // opposite call from MAPBOX_ACCESS_TOKEN, and deliberately so -- without
+  // routing the run produces wrong data, without email it produces right
+  // data quietly.
+  'RESEND_API_KEY',
+  'DIGEST_EMAIL_TO',
+  'RESEND_FROM',
+  // The address a person can open, for links in the digest. Distinct from
+  // SHORT_LIST_URL above, which is derived per-deployment for the revalidate
+  // POST and can rotate.
+  'SITE_URL',
 ] as const
 
 export function buildRunnerEnv(
