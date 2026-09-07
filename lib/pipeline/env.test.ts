@@ -6,7 +6,7 @@ const complete = {
   COMPASS_PASSWORD: 'hunter2',
   COMPASS_COLLECTION_URL: 'https://compass.com/c/1',
   TURSO_DATABASE_URL: 'libsql://db',
-  PIPELINE_TURSO_AUTH_TOKEN: 'rw-token',
+  TURSO_AUTH_TOKEN: 'rw-token',
   BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_x_y',
   REVALIDATE_SECRET: 'revalidate-me',
   VERCEL_PROJECT_PRODUCTION_URL: 'short-list.example',
@@ -21,11 +21,12 @@ describe('buildRunnerEnv', () => {
     expect(env.SOME_OTHER_SECRET).toBeUndefined()
   })
 
-  it('maps the read-write Turso token onto the name the pipeline expects', () => {
-    // short-list's own TURSO_AUTH_TOKEN is read-only by design; a pipeline
-    // has to write. Passing the viewer's token would fail at the first upsert.
-    const env = buildRunnerEnv({ ...complete, TURSO_AUTH_TOKEN: 'read-only' })
-    expect(env.TURSO_AUTH_TOKEN).toBe('rw-token')
+  it('passes the one Turso token through to the sandbox', () => {
+    // There were three until 2026-09-07, on the stated grounds that the
+    // viewer's was read-only. It never was -- measured fully read-write that
+    // day, DROP TABLE included -- so the names described a boundary nobody
+    // had checked. One honest token beats three that all do the same thing.
+    expect(buildRunnerEnv(complete).TURSO_AUTH_TOKEN).toBe('rw-token')
   })
 
   it('derives SHORT_LIST_URL from the production URL', () => {
@@ -116,6 +117,6 @@ describe('buildRunnerEnv', () => {
   })
 
   it('exports what it requires, so the route can report config problems', () => {
-    expect(REQUIRED_VARS).toContain('PIPELINE_TURSO_AUTH_TOKEN')
+    expect(REQUIRED_VARS).toContain('TURSO_AUTH_TOKEN')
   })
 })

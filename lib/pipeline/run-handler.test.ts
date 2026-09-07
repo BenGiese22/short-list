@@ -15,7 +15,7 @@ const env = {
   COMPASS_PASSWORD: 'pw',
   COMPASS_COLLECTION_URL: 'https://compass.com/c/1',
   TURSO_DATABASE_URL: 'libsql://db',
-  PIPELINE_TURSO_AUTH_TOKEN: 'rw',
+  TURSO_AUTH_TOKEN: 'rw',
   BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_a_b',
   REVALIDATE_SECRET: 'rev',
   VERCEL_PROJECT_PRODUCTION_URL: 'short-list.example',
@@ -156,7 +156,7 @@ describe('launcher route', () => {
   })
 
   it('reports a misconfigured environment without leaking values', async () => {
-    const { PIPELINE_TURSO_AUTH_TOKEN, ...broken } = env
+    const { TURSO_AUTH_TOKEN, ...broken } = env
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(fakeSandbox()),
       getState: vi.fn().mockResolvedValue(null), env: broken,
@@ -166,7 +166,7 @@ describe('launcher route', () => {
     const body = await res.text()
 
     expect(res.status).toBe(500)
-    expect(body).toContain('PIPELINE_TURSO_AUTH_TOKEN')
+    expect(body).toContain('TURSO_AUTH_TOKEN')
     expect(body).not.toContain('rw')
   })
 })
