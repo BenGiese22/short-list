@@ -1,23 +1,25 @@
 import { createClient, type Client } from '@libsql/client'
 
-/** A write-capable client, separate from the viewer's read path.
+/** The client used by the one route that writes.
  *
- *  `getDb()` is used by every page render; this is used by exactly one route.
- *  Keeping them apart is the point — a reader that cannot reach a write token
- *  cannot write by accident, however a future refactor rearranges the pages.
+ *  Same credential as `getDb()`, deliberately: there is one Turso token now.
+ *  Three existed until 2026-09-07 — the viewer's, the pipeline's, and a
+ *  write token added for this route — and all three were measured as fully
+ *  read-write, DROP TABLE included, including the one whose comment said
+ *  "read-only by design". Three names for one capability is worse than one
+ *  honest name: it invites reasoning about a boundary that is not there.
  *
- *  Worth recording: the viewer's own `TURSO_AUTH_TOKEN` was documented as
- *  "read-only by design" and measured on 2026-09-07 as fully write-capable,
- *  DROP TABLE included. So this separation is currently a convention rather
- *  than an enforced boundary. Making the viewer's token genuinely read-only
- *  is a five-minute change and would turn it into a real one.
+ *  The SEPARATION that survives is at the code level, and it is the half that
+ *  was ever real. `getDb()` renders pages; this writes. A page cannot reach
+ *  this function by accident however a future refactor rearranges things,
+ *  which is the protection the token names were only pretending to give.
  */
 let _writeDb: Client | null = null
 
 export function getWriteDb(): Client {
   if (!_writeDb) {
-    const authToken = process.env.TURSO_WRITE_TOKEN
-    if (!authToken) throw new Error('TURSO_WRITE_TOKEN is not set')
+    const authToken = process.env.TURSO_AUTH_TOKEN
+    if (!authToken) throw new Error('TURSO_AUTH_TOKEN is not set')
     _writeDb = createClient({ url: process.env.TURSO_DATABASE_URL!, authToken })
   }
   return _writeDb

@@ -13,10 +13,13 @@ export const REQUIRED_VARS = [
   'COMPASS_PASSWORD',
   'COMPASS_COLLECTION_URL',
   'TURSO_DATABASE_URL',
-  // NOT short-list's own TURSO_AUTH_TOKEN: that one is read-only by design,
-  // because the viewer only ever reads. A pipeline writes, so it needs its
-  // own read-write token under a distinct name.
-  'PIPELINE_TURSO_AUTH_TOKEN',
+  // One token, and it is the same one the viewer uses. There were three until
+  // 2026-09-07 -- this project had a separate PIPELINE_TURSO_AUTH_TOKEN on the
+  // stated grounds that "short-list's own TURSO_AUTH_TOKEN is read-only by
+  // design". Measured that day: it was fully read-write, DROP TABLE included.
+  // The distinction had never existed, so the names were describing a boundary
+  // nobody had checked.
+  'TURSO_AUTH_TOKEN',
   'BLOB_READ_WRITE_TOKEN',
   'REVALIDATE_SECRET',
   'VERCEL_PROJECT_PRODUCTION_URL',
@@ -69,7 +72,7 @@ export function buildRunnerEnv(
     COMPASS_PASSWORD: source.COMPASS_PASSWORD!,
     COMPASS_COLLECTION_URL: source.COMPASS_COLLECTION_URL!,
     TURSO_DATABASE_URL: source.TURSO_DATABASE_URL!,
-    TURSO_AUTH_TOKEN: source.PIPELINE_TURSO_AUTH_TOKEN!,
+    TURSO_AUTH_TOKEN: source.TURSO_AUTH_TOKEN!,
     BLOB_READ_WRITE_TOKEN: source.BLOB_READ_WRITE_TOKEN!,
     REVALIDATE_SECRET: source.REVALIDATE_SECRET!,
     // Scoped to Directions and Geocoding only. The commutes stage is the
