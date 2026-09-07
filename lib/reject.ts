@@ -66,15 +66,27 @@ export async function rejectListing(
   const address = (row.address as string) ?? listingId
   if (!propertyId) return { kind: 'no-property-id', address }
 
+  // `listing_ref` is the Compass listing id, and it is captured here rather
+  // than looked up when the pipeline needs it. Rejecting a house is what
+  // removes it from the corpus on the next run — property_ids goes with the
+  // listing — so this is the last moment anything knows which listing it was.
+  // The column is not called `listing_id` on purpose: the pipeline's orphan
+  // sweep finds child tables by that name and would delete these rows.
+  //
+  // compass_synced_at is left NULL, which is what makes the next pipeline run
+  // mark it not interested on Compass. It is not set here: this process
+  // cannot reach Compass, and claiming otherwise is the failure mode this
+  // project keeps producing.
   await db.execute({
     sql: `INSERT OR REPLACE INTO rejections
-            (property_id, address, city, listing_url, reason, rejected_at)
-          VALUES (?, ?, ?, ?,
+            (property_id, address, city, listing_url, listing_ref, reason,
+             rejected_at, compass_synced_at)
+          VALUES (?, ?, ?, ?, ?,
                   COALESCE((SELECT reason FROM rejections WHERE property_id = ?), NULL),
-                  ?)`,
+                  ?, NULL)`,
     args: [
       propertyId, address, row.city as string | null,
-      row.listing_url as string | null, propertyId,
+      row.listing_url as string | null, listingId, propertyId,
       new Date().toISOString(),
     ],
   })
