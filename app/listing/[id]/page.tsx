@@ -4,6 +4,7 @@ import type { Row } from '@libsql/client'
 import { getListing } from '@/lib/queries'
 import { Gallery } from './Gallery'
 import { basementFact, fmtMoney, monthlyCostLine, propertyTaxFact } from '@/lib/facts'
+import { availability, listHref, listStateParams, statusLabel } from '@/lib/status'
 
 // getListing() returns the spread of a libsql `Row` (a `[name: string]: Value`
 // index-signature object) plus `amenities`/`photos`. TypeScript's inference of
@@ -72,13 +73,15 @@ function WarnIcon() {
 
 export default function ListingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | undefined>>
 }) {
   return (
     <main id="detail-view">
       <Suspense fallback={null}>
-        <ListingDetail params={params} />
+        <ListingDetail params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   )
@@ -86,10 +89,15 @@ export default function ListingDetailPage({
 
 async function ListingDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | undefined>>
 }) {
   const { id } = await params
+  // Where the reader came from. The list's sort, search and filters live in
+  // the URL, and a hardcoded href="/" threw all of them away on the way back.
+  const backHref = listHref(listStateParams(await searchParams))
   const listing = await getListing(id)
   if (!listing) {
     // The route shell (and its 200 status) has already streamed to the
@@ -101,16 +109,16 @@ async function ListingDetail({
     return (
       <>
         <div className="detail-topbar">
-          <Link href="/" className="back-btn">← All listings</Link>
+          <Link href={backHref} className="back-btn">← All listings</Link>
         </div>
         <div className="empty-state">Listing not found.</div>
       </>
     )
   }
-  return <ListingDetailBody listing={listing as unknown as Listing} />
+  return <ListingDetailBody listing={listing as unknown as Listing} backHref={backHref} />
 }
 
-function ListingDetailBody({ listing: l }: { listing: Listing }) {
+function ListingDetailBody({ listing: l, backHref }: { listing: Listing; backHref: string }) {
   const composite = l.composite as number | null
   const staged = l.watermarked_staging_detected === 1 || l.suspected_unwatermarked_staging === 1
   const belowCutoff = l.passes_filters === 0
@@ -177,11 +185,15 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
   const layoutPlanClarity = l.layout_plan_clarity_score as number | null
 
   const hasIncompleteData = l.has_incomplete_data === 1
+  // Compass's own market status. Never rendered on this page until now, which
+  // is why a genuinely pending house looked identical to an active one.
+  const marketStatus = statusLabel(l.localized_status)
+  const statusUnavailable = availability(l.localized_status) === 'unavailable'
 
   return (
     <>
       <div className="detail-topbar">
-        <Link href="/" className="back-btn">← All listings</Link>
+        <Link href={backHref} className="back-btn">← All listings</Link>
         <a className="detail-compass" href={listingUrl} target="_blank" rel="noopener">
           View on Compass ↗
         </a>
@@ -206,6 +218,12 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
       ) : null}
 
       <div className="detail-head">
+        {marketStatus ? (
+          <p className={`detail-status${statusUnavailable ? ' is-unavailable' : ''}`}>
+            {marketStatus}
+            {statusUnavailable ? ' — someone else is already buying this' : null}
+          </p>
+        ) : null}
         <h2>{l.address as string}</h2>
         <p className="sub">
           {l.city as string}, {l.state as string} {l.zip_code as string} · Built {yearBuilt ?? '—'}
@@ -228,7 +246,7 @@ function ListingDetailBody({ listing: l }: { listing: Listing }) {
         <h3>Composite score</h3>
         {composite === null ? (
           <div className="composite-block">
-            <div className="composite-num pending-num">Pending</div>
+            <div className="composite-num pending-num">Not scored</div>
             <div className="composite-meta">
               <p className="composite-caption">This listing hasn’t been scored yet.</p>
             </div>

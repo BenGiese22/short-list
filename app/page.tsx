@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Row } from '@libsql/client'
+import { availability, listStateParams, statusLabel } from '@/lib/status'
 import { getListings, type SortKey } from '@/lib/queries'
 import { fmtMoney } from '@/lib/facts'
 import { ListControls } from './ListControls'
@@ -61,10 +62,15 @@ async function ListingCards({
     return <div className="empty-state">No listings match that search or filter.</div>
   }
 
+  // Serialised once for the whole list rather than per card. Only the keys
+  // that shape the list travel -- anything else in the URL is not list state
+  // and has no business coming back on the return trip.
+  const listParams = listStateParams(params)
+
   return (
     <>
       {listings.map((l) => (
-        <ListingCard key={l.listing_id as string} listing={l} />
+        <ListingCard key={l.listing_id as string} listing={l} listParams={listParams} />
       ))}
     </>
   )
@@ -83,7 +89,7 @@ function WarnIcon() {
   )
 }
 
-function ListingCard({ listing: l }: { listing: Row }) {
+function ListingCard({ listing: l, listParams }: { listing: Row; listParams: string }) {
   const id = l.listing_id as string
   const address = l.address as string
   const city = l.city as string
@@ -99,7 +105,13 @@ function ListingCard({ listing: l }: { listing: Row }) {
   const composite = l.composite as number | null
   const staged = l.watermarked_staging_detected === 1 || l.suspected_unwatermarked_staging === 1
   const belowCutoff = l.passes_filters === 0
-  const pending = l.photo_score_unavailable === 1 || l.photo_score_unavailable === null
+  // NOT the market status. This is "the vision model never scored this
+  // listing's photos", which used to render as a badge reading "Pending" --
+  // so the two listings whose photo scoring had failed were labelled Pending
+  // while all seven genuinely under contract showed nothing at all.
+  const noPhotoScore = l.photo_score_unavailable === 1 || l.photo_score_unavailable === null
+  const marketStatus = statusLabel(l.localized_status)
+  const unavailable = availability(l.localized_status) === 'unavailable'
   const garageAttached = l.garage_attached as number | null
   const hasIncompleteData = l.has_incomplete_data === 1
   // The Medtronic (Lafayette) leg, which is the one the score is built on.
@@ -130,10 +142,13 @@ function ListingCard({ listing: l }: { listing: Row }) {
       ? composite / (priceNumeric / 100000)
       : null
 
-  const href = `/listing/${id}`
+  // The list's own state rides along, so the detail page's back link can put
+  // the reader back where they were. Sort, search and filters all live in the
+  // URL already; before this they were dropped by a hardcoded href="/".
+  const href = listParams ? `/listing/${id}?${listParams}` : `/listing/${id}`
 
   return (
-    <article className="card" data-id={id}>
+    <article className={`card${unavailable ? ' card-unavailable' : ''}`} data-id={id}>
       <Link href={href} className="card-open-link" aria-label={`Open ${address}`} />
 
       <div className="thumb-wrap">
@@ -165,7 +180,12 @@ function ListingCard({ listing: l }: { listing: Row }) {
           <div className="badges-inline">
             {staged ? <span className="b-pill staged">⚠ Staged</span> : null}
             {belowCutoff ? <span className="b-pill cutoff">Below cutoff</span> : null}
-            {pending ? <span className="b-pill pending">Pending</span> : null}
+            {marketStatus ? (
+              <span className={`b-pill status${unavailable ? ' is-unavailable' : ''}`}>
+                {marketStatus}
+              </span>
+            ) : null}
+            {noPhotoScore ? <span className="b-pill no-photo-score">No photo score</span> : null}
             {garageAttached === 0 ? <span className="b-pill garage">Detached garage</span> : null}
             {garageAttached === 1 ? <span className="b-pill garage">Attached garage</span> : null}
             {hasIncompleteData ? <span className="b-pill est">Est. data</span> : null}
@@ -177,7 +197,7 @@ function ListingCard({ listing: l }: { listing: Row }) {
 
         <div className="row3">
           {composite === null ? (
-            <div className="composite-mini"><span className="n pending">Pending</span></div>
+            <div className="composite-mini"><span className="n pending">Not scored</span></div>
           ) : (
             <div className="composite-mini"><span className="n">{Math.round(composite)}</span><span className="l">/100</span></div>
           )}
