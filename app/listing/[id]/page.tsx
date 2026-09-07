@@ -188,6 +188,7 @@ function ListingDetailBody({ listing: l, backHref }: { listing: Listing; backHre
   const hasIncompleteData = l.has_incomplete_data === 1
   // Compass's own market status. Never rendered on this page until now, which
   // is why a genuinely pending house looked identical to an active one.
+  const rejected = l.rejected_at != null
   const marketStatus = statusLabel(l.localized_status)
   const statusUnavailable = availability(l.localized_status) === 'unavailable'
 
@@ -219,6 +220,12 @@ function ListingDetailBody({ listing: l, backHref }: { listing: Listing; backHre
       ) : null}
 
       <div className="detail-head">
+        {rejected ? (
+          <p className="detail-status is-rejected">
+            You marked this one not interested. It will be removed on the next run,
+            and will not come back even if it is relisted.
+          </p>
+        ) : null}
         {marketStatus ? (
           <p className={`detail-status${statusUnavailable ? ' is-unavailable' : ''}`}>
             {marketStatus}
@@ -377,9 +384,11 @@ function ListingDetailBody({ listing: l, backHref }: { listing: Listing; backHre
           Open full listing on Compass ↗
         </a>
       </div>
-          <Suspense fallback={null}>
-        <RejectTool listingId={l.listing_id as string} address={l.address as string} />
-      </Suspense>
+          {rejected ? null : (
+        <Suspense fallback={null}>
+          <RejectTool listingId={l.listing_id as string} address={l.address as string} />
+        </Suspense>
+      )}
     </>
   )
 }
