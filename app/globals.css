@@ -489,3 +489,21 @@
   .enter-page input{ border:1px solid var(--line); border-radius: var(--radius-m); padding:9px 12px; font-size:14px; font-family: inherit; color: var(--ink); background: var(--surface); }
   .enter-page button{ margin-top:6px; border:none; border-radius: var(--radius-m); padding:10px; font-size:14px; font-weight:700; background: var(--ink); color: var(--surface); cursor:pointer; }
   .enter-error{ color: var(--warn); font-size:12.5px; font-weight:600; margin:0; }
+
+  /* A destructive action, placed last and styled quietly. It is not something
+     to reach for, and it should not compete with the score or the photos. */
+  .reject-zone{
+    margin: 40px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line);
+    display:flex; flex-direction:column; gap:10px; align-items:flex-start;
+  }
+  .reject-btn{
+    font: inherit; font-size:13px; font-weight:700; padding:8px 14px;
+    border-radius: var(--radius-m); border:1px solid var(--line-strong);
+    background:none; color: var(--ink-2); cursor:pointer;
+  }
+  .reject-btn:hover{ border-color: var(--warn); color: var(--warn); }
+  .reject-btn.is-confirm{ background: var(--warn); border-color: var(--warn); color: var(--warn-ink); }
+  .reject-btn:disabled{ opacity:.6; cursor:default; }
+  .reject-actions{ display:flex; gap:10px; }
+  .reject-warn{ margin:0; font-size:13.5px; color: var(--ink-2); max-width: 48ch; }
+  .reject-error{ margin:0; font-size:13.5px; color: var(--warn); max-width: 60ch; }
