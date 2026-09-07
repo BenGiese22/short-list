@@ -279,6 +279,13 @@
     letter-spacing: 0.04em; color: var(--ink-3);
   }
   .detail-status.is-unavailable{ color: var(--amber); text-transform: none; letter-spacing: 0; font-size: 13px; }
+  /* A house already dismissed. Louder than the market status, because the
+     reader has arrived somewhere they meant to leave. */
+  .detail-status.is-rejected{
+    color: var(--warn); background: var(--warn-soft); border-radius: var(--radius-m);
+    padding: 10px 12px; text-transform: none; letter-spacing: 0; font-size: 13.5px;
+    font-weight: 600; max-width: 60ch;
+  }
   .b-pill.garage{ border:1px solid var(--line); color: var(--ink-2); background:none; text-transform:none; font-weight:700; }
   /* A real HOA fee is the exception on this corpus (9 of 85), so it reads as a
      flag rather than a neutral fact -- amber, matching the value chip's

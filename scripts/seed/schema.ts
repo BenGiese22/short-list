@@ -102,6 +102,21 @@ CREATE TABLE IF NOT EXISTS hosted_photos (
     source_url TEXT,
     PRIMARY KEY (listing_id, position)
 );
+
+CREATE TABLE IF NOT EXISTS property_ids (
+    listing_id TEXT PRIMARY KEY,
+    property_id TEXT NOT NULL,
+    resolved_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rejections (
+    property_id TEXT PRIMARY KEY,
+    address TEXT,
+    city TEXT,
+    listing_url TEXT,
+    reason TEXT,
+    rejected_at TEXT NOT NULL
+);
 `
 
 /** Every table the seed writes, child-first, for a clean re-seed. */

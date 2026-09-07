@@ -37,8 +37,21 @@ export interface ListingsFilter {
   availability?: AvailabilityFilter
 }
 
+/** Houses Ben has said no to, excluded by property rather than by listing.
+ *
+ *  A rejection is recorded against the property id, because Compass mints a
+ *  new listing id when a house relists. The listing rows survive until the
+ *  next pipeline run removes them, so without this the list keeps showing a
+ *  house for up to six hours after it was rejected -- which reads as the
+ *  reject button not having worked.
+ */
+const NOT_REJECTED = `l.listing_id NOT IN (
+    SELECT p.listing_id FROM property_ids p
+    JOIN rejections r ON r.property_id = p.property_id
+  )`
+
 export function buildListingsQuery(filter: ListingsFilter): { sql: string; args: InValue[] } {
-  const clauses: string[] = []
+  const clauses: string[] = [NOT_REJECTED]
   const args: InValue[] = []
 
   if (filter.search) {
@@ -131,7 +144,10 @@ export async function getListing(id: string) {
              vs.garage_attached, vs.watermarked_staging_detected,
              vs.suspected_unwatermarked_staging, vs.staging_notes,
              vs.has_layout_plan, vs.layout_plan_clarity_score, vs.photo_score_unavailable,
-             c.denver_miles, c.denver_minutes, c.medtronic_miles, c.medtronic_minutes
+             c.denver_miles, c.denver_minutes, c.medtronic_miles, c.medtronic_minutes,
+             (SELECT r.rejected_at FROM property_ids p
+                JOIN rejections r ON r.property_id = p.property_id
+               WHERE p.listing_id = l.listing_id) AS rejected_at
       FROM listings l
       LEFT JOIN scores s ON s.listing_id = l.listing_id
       LEFT JOIN visual_scores vs ON vs.listing_id = l.listing_id

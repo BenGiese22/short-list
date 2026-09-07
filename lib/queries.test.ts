@@ -23,6 +23,13 @@ async function seed(db: Client) {
     watermarked_staging_detected INTEGER, suspected_unwatermarked_staging INTEGER,
     staging_notes TEXT, photo_score_unavailable INTEGER, raw_response TEXT, computed_at TEXT
   )`)
+  await db.execute(`CREATE TABLE property_ids (
+    listing_id TEXT PRIMARY KEY, property_id TEXT, resolved_at TEXT
+  )`)
+  await db.execute(`CREATE TABLE rejections (
+    property_id TEXT PRIMARY KEY, address TEXT, city TEXT, listing_url TEXT,
+    reason TEXT, rejected_at TEXT
+  )`)
   await db.execute(`CREATE TABLE hosted_photos (
     listing_id TEXT NOT NULL, position INTEGER NOT NULL, blob_url TEXT NOT NULL,
     PRIMARY KEY (listing_id, position)
@@ -93,6 +100,37 @@ describe('buildListingsQuery', () => {
     const { sql, args } = buildListingsQuery({ sort: '__proto__' as SortKey })
     const result = await db.execute({ sql, args })
     expect(result.rows.map((r) => r.listing_id)).toEqual(['a', 'b'])
+  })
+
+  it('hides a house that has been rejected', async () => {
+    // The rejection is on the PROPERTY; the listing row survives until the
+    // next pipeline run removes it. Without this the list kept showing a
+    // rejected house for up to six hours, which reads as the button not
+    // having worked -- and did, on 2026-09-07.
+    await db.execute("INSERT INTO property_ids VALUES ('a','120OGZ','2026-09-07')")
+    await db.execute(
+      "INSERT INTO rejections VALUES ('120OGZ','1 Main St','Arvada',NULL,NULL,'2026-09-07')")
+
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id)).toEqual(['b'])
+  })
+
+  it('keeps a house whose property was never rejected', async () => {
+    await db.execute("INSERT INTO property_ids VALUES ('a','120OGZ','2026-09-07')")
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('keeps a house with no resolved property id', async () => {
+    // An unresolved property is not a rejected one, and dropping it would
+    // hide a house for a reason that has nothing to do with Ben's opinion.
+    await db.execute(
+      "INSERT INTO rejections VALUES ('120OGZ','1 Main St','Arvada',NULL,NULL,'2026-09-07')")
+    const { sql, args } = buildListingsQuery({})
+    const result = await db.execute({ sql, args })
+    expect(result.rows.map((r) => r.listing_id).sort()).toEqual(['a', 'b'])
   })
 
   it('filters to houses we can still buy', async () => {
