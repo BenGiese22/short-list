@@ -42,6 +42,26 @@ describe('buildRunnerEnv', () => {
     expect(buildRunnerEnv(complete).PYTHONUNBUFFERED).toBe('1')
   })
 
+  it('passes the digest settings through when they are set', () => {
+    const env = buildRunnerEnv({
+      ...complete,
+      RESEND_API_KEY: 're_key',
+      DIGEST_EMAIL_TO: 'ben@example.com',
+      SITE_URL: 'https://short-list.bgiese.tech',
+    })
+    expect(env.RESEND_API_KEY).toBe('re_key')
+    expect(env.DIGEST_EMAIL_TO).toBe('ben@example.com')
+    expect(env.SITE_URL).toBe('https://short-list.bgiese.tech')
+  })
+
+  it('runs without the digest settings', () => {
+    // Optional, not required -- the opposite call from MAPBOX_ACCESS_TOKEN.
+    // Without routing the run produces wrong data; without email it produces
+    // right data quietly, so it must not block a run.
+    expect(() => buildRunnerEnv(complete)).not.toThrow()
+    expect(buildRunnerEnv(complete).RESEND_API_KEY).toBeUndefined()
+  })
+
   it('passes optional vars through only when set', () => {
     expect(buildRunnerEnv(complete).NTFY_TOPIC).toBeUndefined()
     expect(buildRunnerEnv({ ...complete, NTFY_TOPIC: 't' }).NTFY_TOPIC).toBe('t')
