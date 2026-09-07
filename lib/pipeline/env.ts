@@ -35,7 +35,6 @@ export const REQUIRED_VARS = [
 /** Passed through when present, omitted when not. */
 const OPTIONAL_VARS = [
   'COMPASS_COLLECTION_TABS',
-  'LISTING_URLS',
   'ANTHROPIC_API_KEY',
   'NTFY_TOPIC',
   'MAX_PHOTOS_PER_LISTING',
