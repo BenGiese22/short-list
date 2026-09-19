@@ -48,6 +48,7 @@ describe('reaper route', () => {
     await handler(req())
 
     expect(sbx.stop).toHaveBeenCalled()
+    expect(sbx.writeFiles).not.toHaveBeenCalled()
   })
 
   it('collects the refreshed Compass session before stopping', async () => {
@@ -73,16 +74,11 @@ describe('reaper route', () => {
     expect(putState.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
   })
 
+  const hungRunRead = async ({ path }: { path: string }) =>
+    path.endsWith('started') ? marker({ started_at: 1, job: 'pipeline' }) : null
+
   it('clears the started marker before stopping a hung run', async () => {
-    // The sandbox is persistent, so a `started` with no `done` survives the
-    // stop. Left in place, every later launch reads it as a run still in
-    // progress and skips -- forever, because nothing else ever clears it.
-    // The write must land before stop(): afterwards the filesystem is a
-    // snapshot until the next resume.
-    const sbx = fakeSandbox({
-      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started') ? marker({ started_at: 1, job: 'pipeline' }) : null),
-    })
+    const sbx = fakeSandbox({ readFileToBuffer: vi.fn(hungRunRead) })
     const handler = createReapHandler({
       getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,
       now: () => 4 * 60 * 60 * 1000,
@@ -97,21 +93,20 @@ describe('reaper route', () => {
     expect(sbx.writeFiles.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
   })
 
-  it('leaves the markers alone on a finished run', async () => {
+  it('still stops a hung run when clearing the marker fails', async () => {
     const sbx = fakeSandbox({
-      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started') ? marker({ started_at: 1, job: 'canary' })
-        : path.endsWith('done') ? marker({ exit_code: 0, finished_at: 2, job: 'canary' })
-        : null),
+      readFileToBuffer: vi.fn(hungRunRead),
+      writeFiles: vi.fn().mockRejectedValue(new Error('sandbox unreachable')),
     })
     const handler = createReapHandler({
       getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,
+      now: () => 4 * 60 * 60 * 1000,
     })
 
-    await handler(req())
+    const res = await handler(req())
 
-    expect(sbx.stop).toHaveBeenCalled()
-    expect(sbx.writeFiles).not.toHaveBeenCalled()
+    expect(res.status).toBe(200)
+    expect(sbx.stop, 'billing must still be stopped').toHaveBeenCalled()
   })
 
   it('notifies on a failed run', async () => {

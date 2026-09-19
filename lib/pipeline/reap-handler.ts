@@ -144,7 +144,13 @@ export function createReapHandler({
     // to ever clear it. Empty parses as absent (see markers.ts), and it must
     // be written now, while the filesystem is still reachable.
     if (action === 'stop-hung') {
-      await sandbox.writeFiles([{ path: repoPath(`${RUN_DIR}/started`), content: '' }])
+      try {
+        await sandbox.writeFiles([{ path: repoPath(`${RUN_DIR}/started`), content: '' }])
+      } catch {
+        // Same discipline as the session collection above: this must never be
+        // what keeps stop() from running. Worst case the stale marker survives,
+        // which is the older, already-tolerated failure mode -- not billing.
+      }
     }
 
     await sandbox.stop()
