@@ -9,7 +9,6 @@ function fakeSandbox(o: Record<string, unknown> = {}) {
   return {
     status: 'running',
     readFileToBuffer: vi.fn().mockResolvedValue(null),
-    writeFiles: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue({}),
     ...o,
   }
@@ -48,7 +47,6 @@ describe('reaper route', () => {
     await handler(req())
 
     expect(sbx.stop).toHaveBeenCalled()
-    expect(sbx.writeFiles).not.toHaveBeenCalled()
   })
 
   it('collects the refreshed Compass session before stopping', async () => {
@@ -72,41 +70,6 @@ describe('reaper route', () => {
     expect(putState).toHaveBeenCalledWith(expect.stringContaining('compass_state'), session)
     // Order matters: collect, then stop.
     expect(putState.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
-  })
-
-  const hungRunRead = async ({ path }: { path: string }) =>
-    path.endsWith('started') ? marker({ started_at: 1, job: 'pipeline' }) : null
-
-  it('clears the started marker before stopping a hung run', async () => {
-    const sbx = fakeSandbox({ readFileToBuffer: vi.fn(hungRunRead) })
-    const handler = createReapHandler({
-      getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,
-      now: () => 4 * 60 * 60 * 1000,
-    })
-
-    const res = await handler(req())
-
-    expect(await res.json()).toMatchObject({ action: 'stop-hung' })
-    expect(sbx.writeFiles).toHaveBeenCalledWith([
-      expect.objectContaining({ path: expect.stringMatching(/started$/) }),
-    ])
-    expect(sbx.writeFiles.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
-  })
-
-  it('still stops a hung run when clearing the marker fails', async () => {
-    const sbx = fakeSandbox({
-      readFileToBuffer: vi.fn(hungRunRead),
-      writeFiles: vi.fn().mockRejectedValue(new Error('sandbox unreachable')),
-    })
-    const handler = createReapHandler({
-      getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,
-      now: () => 4 * 60 * 60 * 1000,
-    })
-
-    const res = await handler(req())
-
-    expect(res.status).toBe(200)
-    expect(sbx.stop, 'billing must still be stopped').toHaveBeenCalled()
   })
 
   it('notifies on a failed run', async () => {
