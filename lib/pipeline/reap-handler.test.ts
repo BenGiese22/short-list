@@ -9,6 +9,7 @@ function fakeSandbox(o: Record<string, unknown> = {}) {
   return {
     status: 'running',
     readFileToBuffer: vi.fn().mockResolvedValue(null),
+    writeFiles: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue({}),
     ...o,
   }
@@ -70,6 +71,47 @@ describe('reaper route', () => {
     expect(putState).toHaveBeenCalledWith(expect.stringContaining('compass_state'), session)
     // Order matters: collect, then stop.
     expect(putState.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
+  })
+
+  it('clears the started marker before stopping a hung run', async () => {
+    // The sandbox is persistent, so a `started` with no `done` survives the
+    // stop. Left in place, every later launch reads it as a run still in
+    // progress and skips -- forever, because nothing else ever clears it.
+    // The write must land before stop(): afterwards the filesystem is a
+    // snapshot until the next resume.
+    const sbx = fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started') ? marker({ started_at: 1, job: 'pipeline' }) : null),
+    })
+    const handler = createReapHandler({
+      getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,
+      now: () => 4 * 60 * 60 * 1000,
+    })
+
+    const res = await handler(req())
+
+    expect(await res.json()).toMatchObject({ action: 'stop-hung' })
+    expect(sbx.writeFiles).toHaveBeenCalledWith([
+      expect.objectContaining({ path: expect.stringMatching(/started$/) }),
+    ])
+    expect(sbx.writeFiles.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
+  })
+
+  it('leaves the markers alone on a finished run', async () => {
+    const sbx = fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started') ? marker({ started_at: 1, job: 'canary' })
+        : path.endsWith('done') ? marker({ exit_code: 0, finished_at: 2, job: 'canary' })
+        : null),
+    })
+    const handler = createReapHandler({
+      getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,
+    })
+
+    await handler(req())
+
+    expect(sbx.stop).toHaveBeenCalled()
+    expect(sbx.writeFiles).not.toHaveBeenCalled()
   })
 
   it('notifies on a failed run', async () => {
