@@ -98,6 +98,50 @@ describe('launcher route', () => {
     expect(sbx.runCommand.mock.calls.find((c) => c[0]?.detached)).toBeUndefined()
   })
 
+  it('still skips when the started marker is within the sandbox timeout', async () => {
+    const startedAt = 10_000_000
+    const sbx = fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started')
+          ? Buffer.from(JSON.stringify({ started_at: startedAt, job: 'pipeline' }))
+          : null),
+    })
+    const handler = createRunHandler({
+      getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env,
+      now: () => startedAt + 60 * 60 * 1000, // 1h old, well within the 3h timeout
+    })
+
+    const res = await handler(req())
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ skipped: 'in-progress' })
+    expect(sbx.runCommand.mock.calls.find((c) => c[0]?.detached)).toBeUndefined()
+  })
+
+  it('launches a new run when the started marker has gone stale', async () => {
+    // A started marker older than the sandbox's own platform timeout cannot
+    // still be an in-progress run -- the platform would have force-stopped
+    // it by now, whatever killed it. The launcher does not need to know why;
+    // age alone is enough.
+    const startedAt = 10_000_000
+    const sbx = fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started')
+          ? Buffer.from(JSON.stringify({ started_at: startedAt, job: 'pipeline' }))
+          : null),
+    })
+    const handler = createRunHandler({
+      getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn().mockResolvedValue(null), env,
+      now: () => startedAt + 3 * 60 * 60 * 1000 + 1, // just past the 3h timeout
+    })
+
+    const res = await handler(req())
+
+    expect(res.status).toBe(202)
+    const detached = sbx.runCommand.mock.calls.find((c) => c[0]?.detached)
+    expect(detached, 'a stale marker must not block a new launch').toBeTruthy()
+  })
+
   it('seeds the Compass session from Blob only when the disk lacks it', async () => {
     const getState = vi.fn().mockResolvedValue(Buffer.from('{"cookies":[]}'))
     const sbx = fakeSandbox()

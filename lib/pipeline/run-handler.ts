@@ -88,11 +88,13 @@ export function createRunHandler({
   getState,
   env,
   gitUrl = DEFAULT_GIT_URL,
+  now = () => Date.now(),
 }: {
   getOrCreate: (params: Record<string, unknown>) => Promise<MinimalSandbox>
   getState: (pathname: string) => Promise<Buffer | null>
   env: Record<string, string | undefined>
   gitUrl?: string
+  now?: () => number
 }) {
   return async function handle(request: Request): Promise<Response> {
     if (!isCronAuthorized(request.headers.get('authorization'), env.CRON_SECRET)) {
@@ -133,7 +135,15 @@ export function createRunHandler({
       const done = parseDone(
         await sandbox.readFileToBuffer({ path: repoPath(`${RUN_DIR}/done`) }),
       )
-      if (started && !done) {
+      // A `started` marker older than the sandbox's own platform timeout
+      // cannot still be an in-progress run -- the platform would have force-
+      // stopped it by now, whatever killed it (hang, crash, outright
+      // failure, manual stop). Treating it as stale here, rather than relying
+      // on the reaper to have cleared it, covers every way the previous run
+      // could have died without a `done` marker, not just the ones the
+      // reaper's own status classification happens to catch.
+      const stale = started && now() - started.started_at > SANDBOX_TIMEOUT_MS
+      if (started && !done && !stale) {
         return Response.json({ skipped: 'in-progress', job: started.job }, { status: 200 })
       }
 

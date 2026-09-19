@@ -23,7 +23,6 @@ type MinimalSandbox = {
   /** When the sandbox was provisioned; used to tell bootstrapping from orphaned. */
   createdAt?: number | string | Date
   readFileToBuffer(file: { path: string; cwd?: string }): Promise<Buffer | null>
-  writeFiles(files: { path: string; content: string | Uint8Array }[]): Promise<void>
   stop(): Promise<unknown>
 }
 
@@ -136,21 +135,6 @@ export function createReapHandler({
     } catch {
       // Never let this stop the stop. The reaper's job is to end billing;
       // a stale session costs a cold login, an unstopped sandbox costs money.
-    }
-
-    // A hung run's `started` outlives the stop: the sandbox is persistent, and
-    // the runner that would have written `done` is gone. Left there, every
-    // later launch reads it as a run in progress and skips, with nothing else
-    // to ever clear it. Empty parses as absent (see markers.ts), and it must
-    // be written now, while the filesystem is still reachable.
-    if (action === 'stop-hung') {
-      try {
-        await sandbox.writeFiles([{ path: repoPath(`${RUN_DIR}/started`), content: '' }])
-      } catch {
-        // Same discipline as the session collection above: this must never be
-        // what keeps stop() from running. Worst case the stale marker survives,
-        // which is the older, already-tolerated failure mode -- not billing.
-      }
     }
 
     await sandbox.stop()
