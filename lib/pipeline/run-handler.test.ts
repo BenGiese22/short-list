@@ -144,6 +144,21 @@ describe('launcher route', () => {
     expect(detached, 'a stale marker must not block a new launch').toBeTruthy()
   })
 
+  it('tells bootstrap which job it is preparing', async () => {
+    // bootstrap.sh writes a provisional `started` for this job while it holds
+    // the run lock, so a reap tick mid-bootstrap sees a live run rather than
+    // the previous run's `done` -- which it would collect-and-stop.
+    const sbx = fakeSandbox()
+    const handler = createRunHandler({
+      getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn().mockResolvedValue(null), env,
+    })
+
+    await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+    const boot = sbx.runCommand.mock.calls.find((c) => c[0]?.args?.[0] === 'ops/sandbox/bootstrap.sh')
+    expect(boot![0].args).toEqual(['ops/sandbox/bootstrap.sh', 'main', 'pipeline'])
+  })
+
   it('skips, rather than failing, when bootstrap finds the run lock held', async () => {
     // Defense in depth for a live run the markers did not reveal: bootstrap
     // refuses before its `git reset --hard` touches the checkout.

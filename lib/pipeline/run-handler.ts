@@ -197,9 +197,17 @@ export function createRunHandler({
 
       // Bring the checkout to the pinned revision, then bootstrap. Both are
       // idempotent and cost seconds once the snapshot is warm.
+      //
+      // The job is passed so bootstrap can mark the run as started the moment
+      // it holds the run lock: it removes the previous run's `done` and
+      // writes a provisional `started`. Until then a reap tick saw `running`
+      // plus that stale `done` and stopped the sandbox mid-bootstrap. The
+      // marker is bootstrap's to write, not this function's, because only
+      // the lock holder can be sure no live run owns the markers. `job` is
+      // one of JOBS by now, never raw input.
       const bootstrap = (await sandbox.runCommand({
         cmd: 'bash',
-        args: ['ops/sandbox/bootstrap.sh', env.PIPELINE_GIT_REVISION ?? 'main'],
+        args: ['ops/sandbox/bootstrap.sh', env.PIPELINE_GIT_REVISION ?? 'main', job],
         cwd,
         // Inside the route's maxDuration (300s), so a hung bootstrap ends
         // as a 500 with a metric rather than a killed function with none.
