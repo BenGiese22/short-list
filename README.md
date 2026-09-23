@@ -13,11 +13,12 @@ Copy `.env.example` to `.env.local` and fill in:
 | Variable | Purpose |
 | --- | --- |
 | `TURSO_DATABASE_URL` | Turso database URL the app reads from. |
-| `TURSO_AUTH_TOKEN` | Turso auth token. Use the **read-only** token here — `publish.py` uses a separate read-write token to sync data. |
+| `TURSO_AUTH_TOKEN` | Turso auth token. One token for everything: the viewer, the reject route, and the pipeline sandbox. |
 | `SITE_PASSCODE` | Passcode required to enter the site. |
 | `COOKIE_SECRET` | Secret used to sign the session cookie issued after a correct passcode, and every share link. |
 | `SHARE_KEY_VERSION` | Optional, default `1`. Bump to invalidate every outstanding share link (also logs owners out once). |
 | `REVALIDATE_SECRET` | Shared secret `publish.py` sends to `/api/revalidate` after a sync, so the viewer picks up fresh data without waiting for cache expiry. |
+| `CRON_SECRET` | Authorizes the `/api/pipeline/*` cron routes. The pipeline's own variables are listed in [docs/PIPELINE.md](docs/PIPELINE.md#environment). |
 
 ## Running locally
 
@@ -35,4 +36,12 @@ This app never scrapes or scores listings itself. The `home-search` pipeline
 does that against a local SQLite database, and its `publish.py` script mirrors
 the relevant tables (and listing photos) into Turso and Vercel Blob, then
 calls this app's `/api/revalidate` endpoint so pages regenerate with the new
-data. This site only reads from Turso — it never writes back to the pipeline.
+data.
+
+The pipeline runs on a schedule. Vercel crons in this app launch it inside a
+Vercel Sandbox, and a reaper stops the sandbox when the run ends. See
+[docs/PIPELINE.md](docs/PIPELINE.md).
+
+The site has one write path: an owner can reject a house (`/api/reject`). The
+rejection is recorded against the property, so a relisted house stays hidden.
+Everything else is read-only.
