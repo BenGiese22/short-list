@@ -89,12 +89,14 @@ export function createRunHandler({
   env,
   gitUrl = DEFAULT_GIT_URL,
   now = () => Date.now(),
+  notify = () => {},
 }: {
   getOrCreate: (params: Record<string, unknown>) => Promise<MinimalSandbox>
   getState: (pathname: string) => Promise<Buffer | null>
   env: Record<string, string | undefined>
   gitUrl?: string
   now?: () => number
+  notify?: (title: string, message: string) => Promise<unknown> | unknown
 }) {
   return async function handle(request: Request): Promise<Response> {
     if (!isCronAuthorized(request.headers.get('authorization'), env.CRON_SECRET)) {
@@ -143,6 +145,23 @@ export function createRunHandler({
       // could have died without a `done` marker, not just the ones the
       // reaper's own status classification happens to catch.
       if (started && !done && !isRunStale(started, now())) {
+        // A scheduled pipeline launch never legitimately finds a live run:
+        // runs end inside the 3h timeout and the cron is every 6h. The
+        // Sep 8-19 outage was ten days of exactly this, visible only in a
+        // 200 body nobody reads. The canary is exempt -- at 03:30 it can
+        // land inside the 00:00 run.
+        if (job === 'pipeline') {
+          const ageMin = Math.round((now() - started.started_at) / 60_000)
+          try {
+            await notify(
+              'home-search: pipeline launch skipped',
+              `A ${started.job} run started ${ageMin} min ago is still in progress, ` +
+                'so this scheduled pipeline run did not start.',
+            )
+          } catch {
+            // Never let the alert turn a skip into a failure.
+          }
+        }
         return Response.json({ skipped: 'in-progress', job: started.job }, { status: 200 })
       }
 

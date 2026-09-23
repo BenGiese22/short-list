@@ -2,6 +2,7 @@ import { metric } from '@vercel/functions'
 import { Sandbox } from '@vercel/sandbox'
 import { get } from '@vercel/blob'
 import { emitDecision } from '@/lib/pipeline/telemetry'
+import { notify } from '@/lib/pipeline/notify'
 import { createRunHandler } from '@/lib/pipeline/run-handler'
 import { requireStateStoreId } from '@/lib/pipeline/state-store'
 
@@ -40,6 +41,7 @@ async function getState(pathname: string): Promise<Buffer | null> {
 const handle = createRunHandler({
   getOrCreate: (params) => Sandbox.getOrCreate(params as never) as never,
   getState,
+  notify,
   env: process.env,
 })
 

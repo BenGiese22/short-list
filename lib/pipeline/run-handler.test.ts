@@ -143,6 +143,61 @@ describe('launcher route', () => {
     expect(detached, 'a stale marker must not block a new launch').toBeTruthy()
   })
 
+  describe('a skipped pipeline launch', () => {
+    // The Sep 8-19 outage skipped every run for ten days and said so only
+    // in a 200 body nobody reads. A scheduled pipeline launch should never
+    // find another run live -- runs end within the 3h timeout and the cron
+    // is every 6h -- so when one does, somebody should hear about it.
+    const startedAt = 1_788_575_764_000
+    const live = () => fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started') ? startedMarker(startedAt, 'canary') : null),
+    })
+
+    it('alerts, naming the run in the way and its age', async () => {
+      const notify = vi.fn()
+      const handler = createRunHandler({
+        getOrCreate: vi.fn().mockResolvedValue(live()), getState: vi.fn(), env, notify,
+        now: () => startedAt + 42 * 60 * 1000,
+      })
+
+      const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+      expect(await res.json()).toMatchObject({ skipped: 'in-progress' })
+      expect(notify).toHaveBeenCalledTimes(1)
+      const [title, message] = notify.mock.calls[0]
+      expect(title).toMatch(/skipped/)
+      expect(message).toContain('canary')
+      expect(message).toContain('42 min')
+    })
+
+    it('stays quiet when the canary is the one skipped', async () => {
+      // The 03:30 canary can legitimately land inside a pipeline run.
+      const notify = vi.fn()
+      const handler = createRunHandler({
+        getOrCreate: vi.fn().mockResolvedValue(live()), getState: vi.fn(), env, notify,
+        now: () => startedAt + 42 * 60 * 1000,
+      })
+
+      await handler(req('https://x/api/pipeline/run?job=canary'))
+
+      expect(notify).not.toHaveBeenCalled()
+    })
+
+    it('still skips cleanly when the alert itself fails', async () => {
+      const handler = createRunHandler({
+        getOrCreate: vi.fn().mockResolvedValue(live()), getState: vi.fn(), env,
+        notify: vi.fn().mockRejectedValue(new Error('ntfy down')),
+        now: () => startedAt + 42 * 60 * 1000,
+      })
+
+      const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ skipped: 'in-progress' })
+    })
+  })
+
   it('seeds the Compass session from Blob only when the disk lacks it', async () => {
     const getState = vi.fn().mockResolvedValue(Buffer.from('{"cookies":[]}'))
     const sbx = fakeSandbox()
