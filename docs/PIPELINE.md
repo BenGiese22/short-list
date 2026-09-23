@@ -175,3 +175,13 @@ Both predate the outage fix, and both need a decision about the reaper's time so
   `running` plus `done`, decides `collect-and-stop`, and stops the sandbox under
   the launch.
 
+Proposed fix, pending a decision: `bootstrap.sh <revision> <job>` writes the
+provisional marker while it holds `data/.run/lock`. It unlinks `done`, then writes
+`started` with `"provisional": true`. Its EXIT trap writes `done` if bootstrap
+fails. The launcher would be the wrong writer, because it doesn't hold the lock.
+The provisional marker also gives the reaper a session-fresh timestamp, which
+addresses the first issue.
+
+The 270s bootstrap timeout covers the measured 1–2 min cold bootstrap. A cold
+path that includes `playwright install-deps` hasn't been measured.
+
