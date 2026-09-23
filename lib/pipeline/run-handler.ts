@@ -1,5 +1,6 @@
 import { isCronAuthorized } from './auth'
 import { buildRunnerEnv } from './env'
+import { SANDBOX_TIMEOUT_MS, isRunStale } from './limits'
 import { parseDone, parseStarted } from './markers'
 
 /**
@@ -51,6 +52,17 @@ export const REPO_DIR = repoDirFromGitUrl(DEFAULT_GIT_URL)
 /** Named so the failure is asserted rather than restated in a test. */
 export const BOOTSTRAP_EXIT_HINT = 'bootstrap.sh failed'
 
+/** Under app/api/pipeline/run's maxDuration of 300s, with room to answer. */
+export const BOOTSTRAP_TIMEOUT_MS = 270 * 1000
+
+/**
+ * bootstrap.sh's exit when run.py's lock (`data/.run/lock`) is held: a run
+ * is live in this checkout, so it refused before `git reset --hard`. Same
+ * value as run.py's EXIT_LOCKED (EX_TEMPFAIL) in home-search. A skip, not a
+ * failure.
+ */
+export const BOOTSTRAP_LOCKED_EXIT = 75
+
 /**
  * A path inside the checkout, spelled out in full.
  *
@@ -68,8 +80,7 @@ export function repoPath(relative: string): string {
   return `${REPO_DIR}/${relative}`
 }
 
-/** Three hours: score_photos.py legitimately waits hours on a vision batch. */
-export const SANDBOX_TIMEOUT_MS = 3 * 60 * 60 * 1000
+export { SANDBOX_TIMEOUT_MS }
 
 const JOBS = new Set(['pipeline', 'canary'])
 
@@ -89,13 +100,45 @@ export function createRunHandler({
   env,
   gitUrl = DEFAULT_GIT_URL,
   now = () => Date.now(),
+  notify = () => {},
 }: {
   getOrCreate: (params: Record<string, unknown>) => Promise<MinimalSandbox>
   getState: (pathname: string) => Promise<Buffer | null>
   env: Record<string, string | undefined>
   gitUrl?: string
   now?: () => number
+  notify?: (title: string, message: string) => Promise<unknown> | unknown
 }) {
+  /**
+   * Answer a launch that found another run live.
+   *
+   * A scheduled pipeline launch never legitimately finds one: runs end
+   * inside the 3h timeout and the cron is every 6h. The Sep 8-19 outage was
+   * ten days of exactly this, visible only in a 200 body nobody reads. The
+   * canary is exempt -- at 03:30 it can land inside the 00:00 run.
+   */
+  async function skip(
+    job: string,
+    reason: 'in-progress' | 'locked',
+    detail: string,
+    running?: string,
+  ): Promise<Response> {
+    if (job === 'pipeline') {
+      try {
+        await notify(
+          'home-search: pipeline launch skipped',
+          `${detail}, so this scheduled pipeline run did not start.`,
+        )
+      } catch {
+        // Never let the alert turn a skip into a failure.
+      }
+    }
+    // `job` is the job that was ASKED for, as on a launch, so the metric's
+    // job tag separates a skipped pipeline from a skipped canary; `running`
+    // names the run in the way when the markers say which it is.
+    return Response.json({ skipped: reason, job, ...(running && { running }) }, { status: 200 })
+  }
+
   return async function handle(request: Request): Promise<Response> {
     if (!isCronAuthorized(request.headers.get('authorization'), env.CRON_SECRET)) {
       return Response.json({ error: 'unauthorized' }, { status: 401 })
@@ -142,9 +185,14 @@ export function createRunHandler({
       // on the reaper to have cleared it, covers every way the previous run
       // could have died without a `done` marker, not just the ones the
       // reaper's own status classification happens to catch.
-      const stale = started && now() - started.started_at > SANDBOX_TIMEOUT_MS
-      if (started && !done && !stale) {
-        return Response.json({ skipped: 'in-progress', job: started.job }, { status: 200 })
+      if (started && !done && !isRunStale(started, now())) {
+        const ageMin = Math.round((now() - started.started_at) / 60_000)
+        return skip(
+          job,
+          'in-progress',
+          `A ${started.job} run started ${ageMin} min ago is still in progress`,
+          started.job,
+        )
       }
 
       // Bring the checkout to the pinned revision, then bootstrap. Both are
@@ -153,8 +201,19 @@ export function createRunHandler({
         cmd: 'bash',
         args: ['ops/sandbox/bootstrap.sh', env.PIPELINE_GIT_REVISION ?? 'main'],
         cwd,
-        timeoutMs: 10 * 60 * 1000,
+        // Inside the route's maxDuration (300s), so a hung bootstrap ends
+        // as a 500 with a metric rather than a killed function with none.
+        timeoutMs: BOOTSTRAP_TIMEOUT_MS,
       })) as { exitCode?: number | null }
+      // The markers said no run was live, but the lock says one is -- a
+      // run whose marker was lost, or one started outside this launcher.
+      // bootstrap refused before touching the checkout, which is all this
+      // protects: the reaper cannot see the lock, and a running sandbox with
+      // no markers is one it stops as orphaned. See docs/PIPELINE.md.
+      if (bootstrap?.exitCode === BOOTSTRAP_LOCKED_EXIT) {
+        // Which job holds the lock is not known from here.
+        return skip(job, 'locked', 'bootstrap found the run lock held')
+      }
       // Checked, because an unchecked failure here does not stay quiet -- it
       // resurfaces one step later as `fork/exec venv/bin/python: no such file
       // or directory`, which says nothing about the pip install that actually

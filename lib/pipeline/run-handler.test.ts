@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   BOOTSTRAP_EXIT_HINT,
+  BOOTSTRAP_LOCKED_EXIT,
   DEFAULT_GIT_URL,
   REPO_DIR,
   SESSION_PATH,
@@ -8,6 +9,7 @@ import {
   repoDirFromGitUrl,
   repoPath,
 } from './run-handler'
+import { RUN_STALE_AFTER_MS, SANDBOX_TIMEOUT_MS } from './limits'
 
 const env = {
   CRON_SECRET: 's3cret',
@@ -33,6 +35,10 @@ function fakeSandbox(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
+
+/** A started marker as run.py writes it: epoch SECONDS, from time.time(). */
+const startedMarker = (startedAtMs: number, job = 'pipeline') =>
+  Buffer.from(JSON.stringify({ started_at: startedAtMs / 1000, job }))
 
 const req = (url = 'https://x/api/pipeline/run?job=canary', auth = 'Bearer s3cret') =>
   new Request(url, { headers: auth ? { authorization: auth } : {} })
@@ -81,14 +87,14 @@ describe('launcher route', () => {
 
   it('skips when a run is already in progress', async () => {
     // started marker present, done absent
+    const startedAt = 1_788_575_764_000
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started')
-          ? Buffer.from(JSON.stringify({ started_at: Date.now(), job: 'pipeline' }))
-          : null),
+        path.endsWith('started') ? startedMarker(startedAt) : null),
     })
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env,
+      now: () => startedAt + 10 * 60 * 1000, // ten minutes in: the Sep 8 case
     })
 
     const res = await handler(req())
@@ -99,16 +105,14 @@ describe('launcher route', () => {
   })
 
   it('still skips when the started marker is within the sandbox timeout', async () => {
-    const startedAt = 10_000_000
+    const startedAt = 1_788_575_764_000
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started')
-          ? Buffer.from(JSON.stringify({ started_at: startedAt, job: 'pipeline' }))
-          : null),
+        path.endsWith('started') ? startedMarker(startedAt) : null),
     })
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env,
-      now: () => startedAt + 60 * 60 * 1000, // 1h old, well within the 3h timeout
+      now: () => startedAt + SANDBOX_TIMEOUT_MS, // at the platform timeout, inside the margin
     })
 
     const res = await handler(req())
@@ -123,16 +127,14 @@ describe('launcher route', () => {
     // still be an in-progress run -- the platform would have force-stopped
     // it by now, whatever killed it. The launcher does not need to know why;
     // age alone is enough.
-    const startedAt = 10_000_000
+    const startedAt = 1_788_575_764_000
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started')
-          ? Buffer.from(JSON.stringify({ started_at: startedAt, job: 'pipeline' }))
-          : null),
+        path.endsWith('started') ? startedMarker(startedAt) : null),
     })
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn().mockResolvedValue(null), env,
-      now: () => startedAt + 3 * 60 * 60 * 1000 + 1, // just past the 3h timeout
+      now: () => startedAt + RUN_STALE_AFTER_MS + 1, // just past the timeout and its margin
     })
 
     const res = await handler(req())
@@ -140,6 +142,80 @@ describe('launcher route', () => {
     expect(res.status).toBe(202)
     const detached = sbx.runCommand.mock.calls.find((c) => c[0]?.detached)
     expect(detached, 'a stale marker must not block a new launch').toBeTruthy()
+  })
+
+  it('skips, rather than failing, when bootstrap finds the run lock held', async () => {
+    // Defense in depth for a live run the markers did not reveal: bootstrap
+    // refuses before its `git reset --hard` touches the checkout.
+    const sbx = fakeSandbox({
+      runCommand: vi.fn().mockResolvedValue({ exitCode: BOOTSTRAP_LOCKED_EXIT, cmdId: 'c1' }),
+    })
+    const notify = vi.fn()
+    const handler = createRunHandler({
+      getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env, notify,
+    })
+
+    const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ skipped: 'locked', job: 'pipeline' })
+    expect(sbx.runCommand.mock.calls.find((c) => c[0]?.detached)).toBeUndefined()
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  describe('a skipped pipeline launch', () => {
+    // The Sep 8-19 outage skipped every run for ten days and said so only
+    // in a 200 body nobody reads. A scheduled pipeline launch should never
+    // find another run live -- runs end within the 3h timeout and the cron
+    // is every 6h -- so when one does, somebody should hear about it.
+    const startedAt = 1_788_575_764_000
+    const live = () => fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started') ? startedMarker(startedAt, 'canary') : null),
+    })
+
+    it('alerts, naming the run in the way and its age', async () => {
+      const notify = vi.fn()
+      const handler = createRunHandler({
+        getOrCreate: vi.fn().mockResolvedValue(live()), getState: vi.fn(), env, notify,
+        now: () => startedAt + 42 * 60 * 1000,
+      })
+
+      const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+      expect(await res.json()).toEqual({ skipped: 'in-progress', job: 'pipeline', running: 'canary' })
+      expect(notify).toHaveBeenCalledTimes(1)
+      const [title, message] = notify.mock.calls[0]
+      expect(title).toMatch(/skipped/)
+      expect(message).toContain('canary')
+      expect(message).toContain('42 min')
+    })
+
+    it('stays quiet when the canary is the one skipped', async () => {
+      // The 03:30 canary can legitimately land inside a pipeline run.
+      const notify = vi.fn()
+      const handler = createRunHandler({
+        getOrCreate: vi.fn().mockResolvedValue(live()), getState: vi.fn(), env, notify,
+        now: () => startedAt + 42 * 60 * 1000,
+      })
+
+      await handler(req('https://x/api/pipeline/run?job=canary'))
+
+      expect(notify).not.toHaveBeenCalled()
+    })
+
+    it('still skips cleanly when the alert itself fails', async () => {
+      const handler = createRunHandler({
+        getOrCreate: vi.fn().mockResolvedValue(live()), getState: vi.fn(), env,
+        notify: vi.fn().mockRejectedValue(new Error('ntfy down')),
+        now: () => startedAt + 42 * 60 * 1000,
+      })
+
+      const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ skipped: 'in-progress' })
+    })
   })
 
   it('seeds the Compass session from Blob only when the disk lacks it', async () => {

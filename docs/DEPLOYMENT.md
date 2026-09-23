@@ -71,16 +71,17 @@ Add to `~/code/home-search/.env` (never committed — see `.env.example`):
 
 ```
 TURSO_DATABASE_URL=      # same database as the app
-TURSO_AUTH_TOKEN=        # READ-WRITE token — distinct from the app's
+TURSO_AUTH_TOKEN=        # the same token the app uses
 BLOB_READ_WRITE_TOKEN=   # from step 2
 SHORT_LIST_URL=          # the deployed URL
 REVALIDATE_SECRET=       # must match step 3 exactly
 ```
 
-**Use two different Turso tokens.** The app only ever reads, so give it a read-only
-token; `publish.py` needs read-write. Issue the second with `turso db tokens create`.
-The app's token being read-only is the thing that makes a compromised site unable to
-corrupt your data.
+**One Turso token.** The app, `publish.py`, and the scheduled pipeline all use
+`TURSO_AUTH_TOKEN`. Separate "read-only" and "read-write" tokens were used until
+2026-09-07, but every one of them was measured as fully read-write, so the split
+protected nothing. It was collapsed in #24. The protection that remains is in the
+code: page rendering uses `getDb()`, and only the reject route uses `getWriteDb()`.
 
 ## 6. First sync
 
@@ -109,6 +110,13 @@ search/sort/filter work, and a listing opens its detail page and its Compass lin
 Then, as the passcode session, use "Share for 24 hours → Create link", open the link in
 a private window, and confirm it shows the list *without* the share control. Its cookie
 should expire when the link does, not in 90 days.
+
+## 8. Scheduled pipeline
+
+The crons in `vercel.json` run the pipeline in a Vercel Sandbox. Set `CRON_SECRET`
+and the pipeline variables before deploying. The launcher checks every required
+variable on every job, the canary included. See [PIPELINE.md](PIPELINE.md) for the
+launcher, the reaper, the run markers, and how to watch the `pipeline.decision` metric.
 
 ## Known trade-offs, decided deliberately
 

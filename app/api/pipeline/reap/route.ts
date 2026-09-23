@@ -1,6 +1,7 @@
 import { metric } from '@vercel/functions'
 import { Sandbox } from '@vercel/sandbox'
-import { get, put } from '@vercel/blob'
+import { put } from '@vercel/blob'
+import { notify } from '@/lib/pipeline/notify'
 import { emitDecision } from '@/lib/pipeline/telemetry'
 import { createReapHandler } from '@/lib/pipeline/reap-handler'
 import { SANDBOX_NAME } from '@/lib/pipeline/run-handler'
@@ -31,22 +32,6 @@ async function putState(pathname: string, content: Buffer) {
     allowOverwrite: true,
     contentType: 'application/json',
   } as never)
-}
-
-async function notify(title: string, message: string) {
-  const topic = process.env.NTFY_TOPIC
-  if (!topic) return
-  try {
-    await fetch(`https://ntfy.sh/${topic}`, {
-      method: 'POST',
-      headers: { Title: title, Priority: 'high' },
-      body: message,
-      signal: AbortSignal.timeout(5000),
-    })
-  } catch {
-    // Notification is commentary on a run that already ended. Never let it
-    // fail the reap.
-  }
 }
 
 const handle = createReapHandler({ getSandbox, putState, notify, env: process.env })

@@ -151,7 +151,12 @@ export function createReapHandler({
     } else if (action === 'stop-hung') {
       await notify(
         'home-search: run hung',
-        `A ${started?.job ?? 'pipeline'} run started but never finished; the sandbox was stopped.`,
+        // The age says which case this is: ~3h is a run that hung; far older
+        // is a sandbox resumed onto a dead run's marker (a launch whose
+        // bootstrap then failed, or a manual resume), not a hang at all.
+        `A ${started?.job ?? 'pipeline'} run started ` +
+          `${started ? Math.round((now() - started.started_at) / 60_000) : '?'} min ago ` +
+          'and never finished; the sandbox was stopped.',
       )
     } else if (done && done.exit_code !== 0) {
       await notify(

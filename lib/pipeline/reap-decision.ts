@@ -1,18 +1,18 @@
 import type { DoneMarker, StartedMarker } from './markers'
-import { SANDBOX_TIMEOUT_MS } from './run-handler'
+import { RUN_STALE_AFTER_MS } from './limits'
 
 /**
  * How long a run may go without writing its done marker before the reaper
  * stops it.
  *
- * Shares its value with the sandbox's own platform timeout (`run-handler`'s
- * `SANDBOX_TIMEOUT_MS`): sizing this above that timeout would be pointless,
- * and far below it would kill legitimate work -- score_photos.py waits on a
- * vision batch that can legitimately take hours. The platform's own timeout
- * is what actually fires in the worst case; this only catches a runner that
- * died without saying so.
+ * The same threshold the launcher uses to call a marker stale (see
+ * `limits.ts`): the platform's 3h timeout plus a margin for clock skew. Far
+ * below that would kill legitimate work -- score_photos.py waits on a vision
+ * batch that can legitimately take hours. The platform's own timeout is what
+ * actually fires in the worst case; this only catches a runner that died
+ * without saying so.
  */
-export const MAX_RUN_AGE_MS = SANDBOX_TIMEOUT_MS
+export const MAX_RUN_AGE_MS = RUN_STALE_AFTER_MS
 
 /**
  * How long a sandbox may exist without a `started` marker before the reaper

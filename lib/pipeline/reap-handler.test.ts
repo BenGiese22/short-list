@@ -72,6 +72,24 @@ describe('reaper route', () => {
     expect(putState.mock.invocationCallOrder[0]).toBeLessThan(sbx.stop.mock.invocationCallOrder[0])
   })
 
+  it('says how old a hung run is, so a resumed dead marker reads as one', async () => {
+    const startedAt = 1_788_575_764_000
+    const sbx = fakeSandbox({
+      readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
+        path.endsWith('started') ? marker({ started_at: startedAt / 1000, job: 'pipeline' }) : null),
+    })
+    const notify = vi.fn()
+    const handler = createReapHandler({
+      getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify, env,
+      now: () => startedAt + 9 * 60 * 60 * 1000,
+    })
+
+    await handler(req())
+
+    expect(sbx.stop).toHaveBeenCalled()
+    expect(notify.mock.calls[0][1]).toContain('540 min ago')
+  })
+
   it('notifies on a failed run', async () => {
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
@@ -106,10 +124,11 @@ describe('reaper route', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 
-  it('leaves a still-running sandbox alone', async () => {
+  it('leaves a still-running sandbox alone ten minutes in', async () => {
+    // Seconds, as run.py writes them: ten minutes old is the Sep 8 case.
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started') ? marker({ started_at: Date.now(), job: 'pipeline' }) : null),
+        path.endsWith('started') ? marker({ started_at: Date.now() / 1000 - 600, job: 'pipeline' }) : null),
     })
     const handler = createReapHandler({
       getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,

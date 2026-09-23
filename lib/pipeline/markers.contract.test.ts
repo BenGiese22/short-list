@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseDone, parseStarted } from './markers'
+import { decideReap } from './reap-decision'
+import { isRunStale } from './limits'
 
 /**
  * The only place the two languages meet.
@@ -23,23 +25,52 @@ const DONE =
 
 describe('markers written by the Python runner', () => {
   it('reads a real started marker', () => {
-    expect(parseStarted(Buffer.from(STARTED))).toEqual({
-      started_at: 1788575764.082466,
-      job: 'canary',
-    })
+    const started = parseStarted(Buffer.from(STARTED))!
+    expect(started.job).toBe('canary')
+    expect(started.started_at).toBeCloseTo(1788575764082.466, 1)
   })
 
   it('reads a real done marker', () => {
-    expect(parseDone(Buffer.from(DONE))).toEqual({
-      exit_code: 0,
-      finished_at: 1788575767.3939707,
-      job: 'canary',
-    })
+    const done = parseDone(Buffer.from(DONE))!
+    expect(done).toMatchObject({ exit_code: 0, job: 'canary' })
+    expect(done.finished_at).toBeCloseTo(1788575767393.9707, 1)
   })
 
   it('ignores git_sha rather than rejecting the marker for carrying it', () => {
     // The runner records it for operators. A parser that demanded an exact
     // shape would break the moment the Python side added a field.
     expect(parseStarted(Buffer.from(STARTED))).not.toHaveProperty('git_sha')
+  })
+})
+
+/**
+ * The units, asserted through the decisions that consume them.
+ *
+ * run.py writes epoch SECONDS (`time.time()`); everything here compares
+ * against `Date.now()`, epoch MILLISECONDS. Until 2026-09-23 nothing
+ * converted, so every real marker looked ~56 years old: the reaper stopped
+ * any run still going at its first tick as "hung" -- the Sep 8-19 outage --
+ * and the launcher's in-progress guard never fired. Every other test builds
+ * its markers in ms and so agreed with the bug. These use the real bytes.
+ */
+describe('real markers, judged at a realistic Date.now()', () => {
+  const startedMs = 1788575764.082466 * 1000
+  const minutesLater = (m: number) => startedMs + m * 60_000
+
+  it('leaves a run alone ten minutes in', () => {
+    expect(decideReap({
+      status: 'running',
+      started: parseStarted(Buffer.from(STARTED)),
+      done: null,
+      now: minutesLater(10),
+    })).toBe('noop')
+  })
+
+  it('does not call a run stale ten minutes in', () => {
+    expect(isRunStale(parseStarted(Buffer.from(STARTED))!, minutesLater(10))).toBe(false)
+  })
+
+  it('still ages a run out eventually', () => {
+    expect(isRunStale(parseStarted(Buffer.from(STARTED))!, minutesLater(4 * 60))).toBe(true)
   })
 })
