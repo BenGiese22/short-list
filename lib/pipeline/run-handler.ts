@@ -1,5 +1,6 @@
 import { isCronAuthorized } from './auth'
 import { buildRunnerEnv } from './env'
+import { SANDBOX_TIMEOUT_MS, isRunStale } from './limits'
 import { parseDone, parseStarted } from './markers'
 
 /**
@@ -68,8 +69,7 @@ export function repoPath(relative: string): string {
   return `${REPO_DIR}/${relative}`
 }
 
-/** Three hours: score_photos.py legitimately waits hours on a vision batch. */
-export const SANDBOX_TIMEOUT_MS = 3 * 60 * 60 * 1000
+export { SANDBOX_TIMEOUT_MS }
 
 const JOBS = new Set(['pipeline', 'canary'])
 
@@ -142,8 +142,7 @@ export function createRunHandler({
       // on the reaper to have cleared it, covers every way the previous run
       // could have died without a `done` marker, not just the ones the
       // reaper's own status classification happens to catch.
-      const stale = started && now() - started.started_at > SANDBOX_TIMEOUT_MS
-      if (started && !done && !stale) {
+      if (started && !done && !isRunStale(started, now())) {
         return Response.json({ skipped: 'in-progress', job: started.job }, { status: 200 })
       }
 

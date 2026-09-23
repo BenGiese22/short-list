@@ -10,8 +10,20 @@
  * normal case rather than an exceptional one.
  */
 
+/**
+ * Timestamps are epoch MILLISECONDS once parsed, to compare with Date.now().
+ *
+ * On disk they are epoch SECONDS: run.py stamps them with Python's
+ * `time.time()`. The conversion happens here, at the one place the two
+ * languages meet, and unconditionally -- a unit-sniffing heuristic would
+ * quietly accept a writer that changed units, and silent unit drift is what
+ * this fixes. Until 2026-09-23 nothing converted, and every marker read as
+ * ~56 years old; see markers.contract.test.ts.
+ */
 export type StartedMarker = { started_at: number; job: string }
 export type DoneMarker = { exit_code: number; finished_at: number; job: string }
+
+const SECONDS_TO_MS = 1000
 
 function parse(buf: Buffer | null): Record<string, unknown> | null {
   if (!buf || buf.length === 0) return null
@@ -27,7 +39,7 @@ function parse(buf: Buffer | null): Record<string, unknown> | null {
 export function parseStarted(buf: Buffer | null): StartedMarker | null {
   const o = parse(buf)
   if (!o || typeof o.started_at !== 'number' || typeof o.job !== 'string') return null
-  return { started_at: o.started_at, job: o.job }
+  return { started_at: o.started_at * SECONDS_TO_MS, job: o.job }
 }
 
 export function parseDone(buf: Buffer | null): DoneMarker | null {
@@ -40,5 +52,5 @@ export function parseDone(buf: Buffer | null): DoneMarker | null {
   ) {
     return null
   }
-  return { exit_code: o.exit_code, finished_at: o.finished_at, job: o.job }
+  return { exit_code: o.exit_code, finished_at: o.finished_at * SECONDS_TO_MS, job: o.job }
 }

@@ -106,10 +106,11 @@ describe('reaper route', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 
-  it('leaves a still-running sandbox alone', async () => {
+  it('leaves a still-running sandbox alone ten minutes in', async () => {
+    // Seconds, as run.py writes them: ten minutes old is the Sep 8 case.
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started') ? marker({ started_at: Date.now(), job: 'pipeline' }) : null),
+        path.endsWith('started') ? marker({ started_at: Date.now() / 1000 - 600, job: 'pipeline' }) : null),
     })
     const handler = createReapHandler({
       getSandbox: vi.fn().mockResolvedValue(sbx), putState: vi.fn(), notify: vi.fn(), env,

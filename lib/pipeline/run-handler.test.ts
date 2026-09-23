@@ -8,6 +8,7 @@ import {
   repoDirFromGitUrl,
   repoPath,
 } from './run-handler'
+import { RUN_STALE_AFTER_MS, SANDBOX_TIMEOUT_MS } from './limits'
 
 const env = {
   CRON_SECRET: 's3cret',
@@ -33,6 +34,10 @@ function fakeSandbox(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
+
+/** A started marker as run.py writes it: epoch SECONDS, from time.time(). */
+const startedMarker = (startedAtMs: number, job = 'pipeline') =>
+  Buffer.from(JSON.stringify({ started_at: startedAtMs / 1000, job }))
 
 const req = (url = 'https://x/api/pipeline/run?job=canary', auth = 'Bearer s3cret') =>
   new Request(url, { headers: auth ? { authorization: auth } : {} })
@@ -81,14 +86,14 @@ describe('launcher route', () => {
 
   it('skips when a run is already in progress', async () => {
     // started marker present, done absent
+    const startedAt = 1_788_575_764_000
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started')
-          ? Buffer.from(JSON.stringify({ started_at: Date.now(), job: 'pipeline' }))
-          : null),
+        path.endsWith('started') ? startedMarker(startedAt) : null),
     })
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env,
+      now: () => startedAt + 10 * 60 * 1000, // ten minutes in: the Sep 8 case
     })
 
     const res = await handler(req())
@@ -99,16 +104,14 @@ describe('launcher route', () => {
   })
 
   it('still skips when the started marker is within the sandbox timeout', async () => {
-    const startedAt = 10_000_000
+    const startedAt = 1_788_575_764_000
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started')
-          ? Buffer.from(JSON.stringify({ started_at: startedAt, job: 'pipeline' }))
-          : null),
+        path.endsWith('started') ? startedMarker(startedAt) : null),
     })
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env,
-      now: () => startedAt + 60 * 60 * 1000, // 1h old, well within the 3h timeout
+      now: () => startedAt + SANDBOX_TIMEOUT_MS, // at the platform timeout, inside the margin
     })
 
     const res = await handler(req())
@@ -123,16 +126,14 @@ describe('launcher route', () => {
     // still be an in-progress run -- the platform would have force-stopped
     // it by now, whatever killed it. The launcher does not need to know why;
     // age alone is enough.
-    const startedAt = 10_000_000
+    const startedAt = 1_788_575_764_000
     const sbx = fakeSandbox({
       readFileToBuffer: vi.fn(async ({ path }: { path: string }) =>
-        path.endsWith('started')
-          ? Buffer.from(JSON.stringify({ started_at: startedAt, job: 'pipeline' }))
-          : null),
+        path.endsWith('started') ? startedMarker(startedAt) : null),
     })
     const handler = createRunHandler({
       getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn().mockResolvedValue(null), env,
-      now: () => startedAt + 3 * 60 * 60 * 1000 + 1, // just past the 3h timeout
+      now: () => startedAt + RUN_STALE_AFTER_MS + 1, // just past the timeout and its margin
     })
 
     const res = await handler(req())

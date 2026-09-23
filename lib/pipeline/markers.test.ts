@@ -6,13 +6,21 @@ const buf = (o: unknown) => Buffer.from(JSON.stringify(o))
 describe('run markers', () => {
   it('reads a started marker', () => {
     expect(parseStarted(buf({ started_at: 1000, job: 'canary' }))).toEqual({
-      started_at: 1000, job: 'canary',
+      started_at: 1_000_000, job: 'canary',
     })
+  })
+
+  it('converts the runner\'s epoch seconds to milliseconds', () => {
+    // run.py stamps markers with time.time(); everything reading them
+    // compares against Date.now().
+    const seconds = Date.now() / 1000
+    expect(parseStarted(buf({ started_at: seconds, job: 'pipeline' }))!.started_at)
+      .toBeCloseTo(seconds * 1000)
   })
 
   it('reads a done marker', () => {
     expect(parseDone(buf({ exit_code: 0, finished_at: 2000, job: 'canary' }))).toEqual({
-      exit_code: 0, finished_at: 2000, job: 'canary',
+      exit_code: 0, finished_at: 2_000_000, job: 'canary',
     })
   })
 
