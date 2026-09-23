@@ -158,7 +158,7 @@ describe('launcher route', () => {
     const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
 
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ skipped: 'in-progress', job: 'unknown' })
+    expect(await res.json()).toEqual({ skipped: 'locked', job: 'pipeline' })
     expect(sbx.runCommand.mock.calls.find((c) => c[0]?.detached)).toBeUndefined()
     expect(notify).toHaveBeenCalledTimes(1)
   })
@@ -183,7 +183,7 @@ describe('launcher route', () => {
 
       const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
 
-      expect(await res.json()).toMatchObject({ skipped: 'in-progress' })
+      expect(await res.json()).toEqual({ skipped: 'in-progress', job: 'pipeline', running: 'canary' })
       expect(notify).toHaveBeenCalledTimes(1)
       const [title, message] = notify.mock.calls[0]
       expect(title).toMatch(/skipped/)

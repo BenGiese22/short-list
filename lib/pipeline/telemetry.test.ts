@@ -13,6 +13,7 @@ describe('outcomeOf', () => {
   it('distinguishes a launch from a skip', () => {
     expect(outcomeOf('run', 202, { started: true })).toBe('started')
     expect(outcomeOf('run', 200, { skipped: 'in-progress' })).toBe('skipped:in-progress')
+    expect(outcomeOf('run', 200, { skipped: 'locked' })).toBe('skipped:locked')
   })
 
   it('separates auth failure from a real error', () => {
