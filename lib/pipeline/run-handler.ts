@@ -53,6 +53,14 @@ export const REPO_DIR = repoDirFromGitUrl(DEFAULT_GIT_URL)
 export const BOOTSTRAP_EXIT_HINT = 'bootstrap.sh failed'
 
 /**
+ * bootstrap.sh's exit when run.py's lock (`data/.run/lock`) is held: a run
+ * is live in this checkout, so it refused before `git reset --hard`. Same
+ * value as run.py's EXIT_LOCKED (EX_TEMPFAIL) in home-search. A skip, not a
+ * failure.
+ */
+export const BOOTSTRAP_LOCKED_EXIT = 75
+
+/**
  * A path inside the checkout, spelled out in full.
  *
  * The file APIs take a `cwd` in their type signature and IGNORE it. Verified
@@ -98,6 +106,32 @@ export function createRunHandler({
   now?: () => number
   notify?: (title: string, message: string) => Promise<unknown> | unknown
 }) {
+  /**
+   * Answer a launch that found another run live.
+   *
+   * A scheduled pipeline launch never legitimately finds one: runs end
+   * inside the 3h timeout and the cron is every 6h. The Sep 8-19 outage was
+   * ten days of exactly this, visible only in a 200 body nobody reads. The
+   * canary is exempt -- at 03:30 it can land inside the 00:00 run.
+   */
+  async function skipInProgress(
+    job: string,
+    liveJob: string,
+    detail: string,
+  ): Promise<Response> {
+    if (job === 'pipeline') {
+      try {
+        await notify(
+          'home-search: pipeline launch skipped',
+          `${detail}, so this scheduled pipeline run did not start.`,
+        )
+      } catch {
+        // Never let the alert turn a skip into a failure.
+      }
+    }
+    return Response.json({ skipped: 'in-progress', job: liveJob }, { status: 200 })
+  }
+
   return async function handle(request: Request): Promise<Response> {
     if (!isCronAuthorized(request.headers.get('authorization'), env.CRON_SECRET)) {
       return Response.json({ error: 'unauthorized' }, { status: 401 })
@@ -145,24 +179,12 @@ export function createRunHandler({
       // could have died without a `done` marker, not just the ones the
       // reaper's own status classification happens to catch.
       if (started && !done && !isRunStale(started, now())) {
-        // A scheduled pipeline launch never legitimately finds a live run:
-        // runs end inside the 3h timeout and the cron is every 6h. The
-        // Sep 8-19 outage was ten days of exactly this, visible only in a
-        // 200 body nobody reads. The canary is exempt -- at 03:30 it can
-        // land inside the 00:00 run.
-        if (job === 'pipeline') {
-          const ageMin = Math.round((now() - started.started_at) / 60_000)
-          try {
-            await notify(
-              'home-search: pipeline launch skipped',
-              `A ${started.job} run started ${ageMin} min ago is still in progress, ` +
-                'so this scheduled pipeline run did not start.',
-            )
-          } catch {
-            // Never let the alert turn a skip into a failure.
-          }
-        }
-        return Response.json({ skipped: 'in-progress', job: started.job }, { status: 200 })
+        const ageMin = Math.round((now() - started.started_at) / 60_000)
+        return skipInProgress(
+          job,
+          started.job,
+          `A ${started.job} run started ${ageMin} min ago is still in progress`,
+        )
       }
 
       // Bring the checkout to the pinned revision, then bootstrap. Both are
@@ -173,6 +195,13 @@ export function createRunHandler({
         cwd,
         timeoutMs: 10 * 60 * 1000,
       })) as { exitCode?: number | null }
+      // The markers said no run was live, but the lock says one is -- a
+      // run whose marker was lost, or one started outside this launcher.
+      // bootstrap refused before touching the checkout; leave it be.
+      if (bootstrap?.exitCode === BOOTSTRAP_LOCKED_EXIT) {
+        // Which job holds the lock is not known from here.
+        return skipInProgress(job, 'unknown', 'bootstrap found the run lock held')
+      }
       // Checked, because an unchecked failure here does not stay quiet -- it
       // resurfaces one step later as `fork/exec venv/bin/python: no such file
       // or directory`, which says nothing about the pip install that actually

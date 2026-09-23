@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   BOOTSTRAP_EXIT_HINT,
+  BOOTSTRAP_LOCKED_EXIT,
   DEFAULT_GIT_URL,
   REPO_DIR,
   SESSION_PATH,
@@ -141,6 +142,25 @@ describe('launcher route', () => {
     expect(res.status).toBe(202)
     const detached = sbx.runCommand.mock.calls.find((c) => c[0]?.detached)
     expect(detached, 'a stale marker must not block a new launch').toBeTruthy()
+  })
+
+  it('skips, rather than failing, when bootstrap finds the run lock held', async () => {
+    // Defense in depth for a live run the markers did not reveal: bootstrap
+    // refuses before its `git reset --hard` touches the checkout.
+    const sbx = fakeSandbox({
+      runCommand: vi.fn().mockResolvedValue({ exitCode: BOOTSTRAP_LOCKED_EXIT, cmdId: 'c1' }),
+    })
+    const notify = vi.fn()
+    const handler = createRunHandler({
+      getOrCreate: vi.fn().mockResolvedValue(sbx), getState: vi.fn(), env, notify,
+    })
+
+    const res = await handler(req('https://x/api/pipeline/run?job=pipeline'))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ skipped: 'in-progress', job: 'unknown' })
+    expect(sbx.runCommand.mock.calls.find((c) => c[0]?.detached)).toBeUndefined()
+    expect(notify).toHaveBeenCalledTimes(1)
   })
 
   describe('a skipped pipeline launch', () => {
