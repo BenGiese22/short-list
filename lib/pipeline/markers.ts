@@ -20,7 +20,9 @@
  * this fixes. Until 2026-09-23 nothing converted, and every marker read as
  * ~56 years old; see markers.contract.test.ts.
  */
-export type StartedMarker = { started_at: number; job: string }
+/** `provisional` is set only on the marker bootstrap.sh writes under the run
+ *  lock; run.py's own marker, which replaces it, never carries it. */
+export type StartedMarker = { started_at: number; job: string; provisional?: true }
 export type DoneMarker = { exit_code: number; finished_at: number; job: string }
 
 const SECONDS_TO_MS = 1000
@@ -39,7 +41,11 @@ function parse(buf: Buffer | null): Record<string, unknown> | null {
 export function parseStarted(buf: Buffer | null): StartedMarker | null {
   const o = parse(buf)
   if (!o || typeof o.started_at !== 'number' || typeof o.job !== 'string') return null
-  return { started_at: o.started_at * SECONDS_TO_MS, job: o.job }
+  return {
+    started_at: o.started_at * SECONDS_TO_MS,
+    job: o.job,
+    ...(o.provisional === true && { provisional: true as const }),
+  }
 }
 
 export function parseDone(buf: Buffer | null): DoneMarker | null {

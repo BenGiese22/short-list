@@ -99,6 +99,28 @@ describe('the provisional marker bootstrap writes', () => {
     })).toBe('noop')
   })
 
+  it('stops a launch whose run never started, within the bootstrap budget', () => {
+    // run.py replaces this marker seconds after bootstrap ends. Still
+    // provisional past the budget means the launcher died between the two:
+    // an idle sandbox that would otherwise bill to the 3h timeout.
+    const started = parseStarted(Buffer.from(PROVISIONAL))!
+    expect(started.provisional).toBe(true)
+    expect(decideReap({
+      status: 'running', started, done: null, now: startedMs + 16 * 60_000,
+    })).toBe('stop-orphaned')
+    expect(isRunStale(started, startedMs + 16 * 60_000)).toBe(true)
+    expect(isRunStale(started, startedMs + 5 * 60_000)).toBe(false)
+  })
+
+  it('holds a real run to the 3h rule, not the bootstrap budget', () => {
+    const real = parseStarted(Buffer.from(STARTED))!
+    expect(real).not.toHaveProperty('provisional')
+    expect(decideReap({
+      status: 'running', started: real, done: null,
+      now: real.started_at + 16 * 60_000,
+    })).toBe('noop')
+  })
+
   it('lets a failed bootstrap be collected, not wait out the age limit', () => {
     // bootstrap's EXIT trap writes `done` with its exit code on failure.
     const failed = '{"exit_code": 1, "finished_at": 1790208095.0, "job": "pipeline"}'

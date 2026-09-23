@@ -75,8 +75,12 @@ Bootstrap writes the first `started` of a launch:
 any git or pip work, after deleting the previous run's `done`. run.py overwrites
 it when the run begins. If bootstrap fails, its EXIT trap writes `done` with the
 exit code, so the reaper collects the sandbox right away and alerts "run failed".
-The parser ignores `provisional`, so the reaper treats a provisional marker as a
-live run, which it is about to be.
+run.py's own marker never carries `provisional`, so a marker that still has it
+means `run.py` hasn't started. The reaper and the launcher both age a provisional
+marker against the 15-minute bootstrap budget (`BOOTSTRAP_BUDGET_MS`), not the
+3h15m run limit. Past that budget, the launcher died between bootstrap and
+`run.py`, and no run is coming. The reaper stops the sandbox as orphaned, and the
+next launch ignores the marker.
 
 On disk the timestamps are epoch **seconds**, from Python's `time.time()`.
 `parseStarted` and `parseDone` convert them to milliseconds, unconditionally, so
@@ -98,7 +102,7 @@ decides:
 | `noop` | Not running, or a run is inside its age limit, or bootstrap is inside its budget | Nothing. |
 | `collect-and-stop` | `done` exists | Save the Compass session to Blob, stop, and notify if `exit_code` ≠ 0. |
 | `stop-hung` | `started` older than `MAX_RUN_AGE_MS` (= `RUN_STALE_AFTER_MS`, 3h15m), no `done` | Save the session, stop, and notify. |
-| `stop-orphaned` | No markers after the bootstrap budget | Save the session, stop, and notify. |
+| `stop-orphaned` | No markers, or only bootstrap's provisional `started`, past the 15-min bootstrap budget | Save the session, stop, and notify. |
 
 The reaper never clears markers. A stale `started` left behind by any stop path
 is handled by the launcher's age check.
