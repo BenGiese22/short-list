@@ -24,6 +24,18 @@ export const SANDBOX_TIMEOUT_MS = 3 * 60 * 60 * 1000
  */
 export const STALE_MARGIN_MS = 15 * 60 * 1000
 
+/**
+ * How long bootstrap may take before its launch counts as orphaned.
+ *
+ * bootstrap.sh is budgeted at two minutes cold (and capped at 270s by the
+ * launcher), so fifteen is generous enough that no honest bootstrap trips
+ * it. Applies to a sandbox with no marker at all, and to one whose `started`
+ * is still bootstrap's provisional marker: run.py replaces that within
+ * seconds of bootstrap ending, so one this old means the launcher died
+ * between the two and nothing will ever run.
+ */
+export const BOOTSTRAP_BUDGET_MS = 15 * 60 * 1000
+
 /** The age past which a `started` marker without a `done` is a dead run. */
 export const RUN_STALE_AFTER_MS = SANDBOX_TIMEOUT_MS + STALE_MARGIN_MS
 
@@ -35,5 +47,6 @@ export const RUN_STALE_AFTER_MS = SANDBOX_TIMEOUT_MS + STALE_MARGIN_MS
  * have stopped it by now, so the launcher need not know which.
  */
 export function isRunStale(started: StartedMarker, now: number): boolean {
-  return now - started.started_at > RUN_STALE_AFTER_MS
+  const limit = started.provisional ? BOOTSTRAP_BUDGET_MS : RUN_STALE_AFTER_MS
+  return now - started.started_at > limit
 }

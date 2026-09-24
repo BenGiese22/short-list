@@ -1,5 +1,5 @@
 import type { DoneMarker, StartedMarker } from './markers'
-import { RUN_STALE_AFTER_MS } from './limits'
+import { BOOTSTRAP_BUDGET_MS, RUN_STALE_AFTER_MS } from './limits'
 
 /**
  * How long a run may go without writing its done marker before the reaper
@@ -16,19 +16,18 @@ export const MAX_RUN_AGE_MS = RUN_STALE_AFTER_MS
 
 /**
  * How long a sandbox may exist without a `started` marker before the reaper
- * treats it as orphaned rather than still bootstrapping.
+ * treats it as orphaned rather than still bootstrapping. Defined in
+ * limits.ts, which also applies it to bootstrap's provisional marker.
  *
- * bootstrap.sh is budgeted at two minutes cold, so fifteen is generous
- * enough that no honest bootstrap trips it. It exists because the launcher
- * provisions the sandbox BEFORE it writes anything: if it then throws --
- * a bad store id, an SDK call that fails, a timeout -- the sandbox is left
- * running with no marker, and the "still bootstrapping" branch below used to
- * return noop for that state forever. The platform's own 3h timeout was the
- * only thing that stopped it, at roughly $0.70 of provisioned memory a go.
- *
- * Observed on the first real cloud launch, which had to be stopped by hand.
+ * It exists because the launcher provisions the sandbox BEFORE anything is
+ * written: if it then throws -- a bad store id, an SDK call that fails, a
+ * timeout -- the sandbox is left running with no marker, and the "still
+ * bootstrapping" branch below used to return noop for that state forever.
+ * The platform's own 3h timeout was the only thing that stopped it, at
+ * roughly $0.70 of provisioned memory a go. Observed on the first real cloud
+ * launch, which had to be stopped by hand.
  */
-export const BOOTSTRAP_BUDGET_MS = 15 * 60 * 1000
+export { BOOTSTRAP_BUDGET_MS }
 
 /**
  * The SDK's own status union, plus `absent` for "no sandbox at all".
@@ -123,6 +122,13 @@ export function decideReap({
   // Started and never finished. Only past the age limit, so a legitimately
   // long run is left alone.
   if (started) {
+    // Bootstrap's provisional marker, not yet replaced by run.py's. Aged on
+    // its own started_at -- this session's time, unlike createdAt -- against
+    // the bootstrap budget: past it, the launcher died after bootstrap and
+    // no run is coming, so this is the orphan case, not a hang.
+    if (started.provisional) {
+      return now - started.started_at > bootstrapBudgetMs ? 'stop-orphaned' : 'noop'
+    }
     return now - started.started_at > maxAgeMs ? 'stop-hung' : 'noop'
   }
 

@@ -24,13 +24,19 @@ From `vercel.json`, all authorized by `CRON_SECRET`:
 3. Reads the run markers (below). If a `started` marker has no `done` beside it
    **and is younger than `RUN_STALE_AFTER_MS`** (3h15m), it returns
    `{ "skipped": "in-progress" }` and launches nothing.
-4. Otherwise it runs `ops/sandbox/bootstrap.sh`, which has 270s to finish inside the
-   route's 300s `maxDuration`. Exit **75** means run.py's lock (`data/.run/lock`)
-   is held by a live run the markers missed. Bootstrap refuses before its
-   `git reset --hard`, and the launcher answers `{ "skipped": "locked" }`. This
-   needs home-search's bootstrap lock change (branch
-   `bgiese/fix-turso-retry-bootstrap-lock`). Until that ships, bootstrap never
-   exits 75.
+4. Otherwise it runs `ops/sandbox/bootstrap.sh <revision> <job>`, which has 270s
+   to finish inside the route's 300s `maxDuration`. Bootstrap first takes run.py's
+   lock (`data/.run/lock`), then deletes the previous run's `done` and writes a
+   provisional `started` for this job (see markers, below). Exit codes:
+   - **75:** the lock is held by a live run that the markers missed. Bootstrap
+     refuses before touching anything, and the launcher answers
+     `{ "skipped": "locked" }`.
+   - **Anything else nonzero:** a failed launch (`500`). That includes 69 (no way
+     to take the lock) and 64 (a malformed job name).
+
+   Both the lock and the provisional marker need home-search's bootstrap change
+   (branch `bgiese/post-outage-fixes`) on home-search `main`. Until that ships,
+   bootstrap ignores the job argument, writes no markers, and never exits 75.
 5. Seeds the Compass session from Blob if the sandbox has none, and starts
    `ops/sandbox/run.py <job>` detached. Returns `202`.
 
@@ -64,6 +70,18 @@ files into the checkout at `data/.run/`:
 - `done` — `{ "exit_code", "finished_at", "job" }`, written when it ends,
   cleanly or not.
 
+Bootstrap writes the first `started` of a launch:
+`{ "started_at", "job", "provisional": true }`. It writes it under the lock, before
+any git or pip work, after deleting the previous run's `done`. run.py overwrites
+it when the run begins. If bootstrap fails, its EXIT trap writes `done` with the
+exit code, so the reaper collects the sandbox right away and alerts "run failed".
+run.py's own marker never carries `provisional`, so a marker that still has it
+means `run.py` hasn't started. The reaper and the launcher both age a provisional
+marker against the 15-minute bootstrap budget (`BOOTSTRAP_BUDGET_MS`), not the
+3h15m run limit. Past that budget, the launcher died between bootstrap and
+`run.py`, and no run is coming. The reaper stops the sandbox as orphaned, and the
+next launch ignores the marker.
+
 On disk the timestamps are epoch **seconds**, from Python's `time.time()`.
 `parseStarted` and `parseDone` convert them to milliseconds, unconditionally, so
 that everything downstream can compare them with `Date.now()`.
@@ -84,7 +102,7 @@ decides:
 | `noop` | Not running, or a run is inside its age limit, or bootstrap is inside its budget | Nothing. |
 | `collect-and-stop` | `done` exists | Save the Compass session to Blob, stop, and notify if `exit_code` ≠ 0. |
 | `stop-hung` | `started` older than `MAX_RUN_AGE_MS` (= `RUN_STALE_AFTER_MS`, 3h15m), no `done` | Save the session, stop, and notify. |
-| `stop-orphaned` | No markers after the bootstrap budget | Save the session, stop, and notify. |
+| `stop-orphaned` | No markers, or only bootstrap's provisional `started`, past the 15-min bootstrap budget | Save the session, stop, and notify. |
 
 The reaper never clears markers. A stale `started` left behind by any stop path
 is handled by the launcher's age check.
@@ -154,34 +172,35 @@ old.
   staleness into the launcher, but the unit bug made that check always true, so
   the launcher stopped protecting live runs. The reaper's copy of the bug stayed
   live, and it stopped the Sep 23 00:00Z run 9m53s in.
-- **Fix:** the markers are now converted at the parse boundary, and the real
+- **Fix (#29):** the markers are now converted at the parse boundary, and the real
   bytes are asserted through both decisions. A skipped pipeline launch now
-  alerts, and a locked bootstrap counts as a skip.
+  alerts, and a locked bootstrap counts as a skip. A follow-up had bootstrap write
+  a provisional `started`, which closed the two reaper races below.
 
-## Open issues
+## Reaper races closed by the provisional marker
 
-Both predate the outage fix, and both need a decision about the reaper's time source.
+Two issues predated the outage fix. The provisional marker closes both, once
+home-search's bootstrap change is on `main`.
 
+- **A reap tick could land mid-bootstrap.** The reap cron (`*/10`) fires at :00
+  too. The previous run's `done` used to stay on disk until run.py deleted it after
+  bootstrap, so a reap in that window saw `running` plus `done`, decided
+  `collect-and-stop`, and stopped the sandbox under the launch. Now bootstrap
+  deletes `done` as soon as it holds the lock, a few seconds into the launch.
 - **The bootstrap budget measures the wrong clock.** `stop-orphaned` compares
   against `Sandbox.createdAt`, which is when the named sandbox was first created,
-  not when the current session started. For this persistent sandbox that is days
-  ago, so a running session with no markers is "orphaned" at its first reap tick.
-  The markers normally persist on disk, so this only matters when they are gone:
-  a fresh sandbox, lost markers, or a run started outside the launcher. The last
-  case includes the one `skipped: "locked"` exists for.
-- **A reap tick can land mid-bootstrap.** The reap cron (`*/10`) fires at :00 too.
-  The launcher resumes the stopped sandbox, and the previous run's `done` stays on
-  disk until run.py deletes it after bootstrap. A reap in that window sees
-  `running` plus `done`, decides `collect-and-stop`, and stops the sandbox under
-  the launch.
+  not when the current session started. For this persistent sandbox that was days
+  ago, so a running session with no markers counted as "orphaned" at its first
+  reap tick. A launch now always has a fresh `started`, so the reaper never
+  reaches that path mid-launch.
 
-Proposed fix, pending a decision: `bootstrap.sh <revision> <job>` writes the
-provisional marker while it holds `data/.run/lock`. It unlinks `done`, then writes
-`started` with `"provisional": true`. Its EXIT trap writes `done` if bootstrap
-fails. The launcher would be the wrong writer, because it doesn't hold the lock.
-The provisional marker also gives the reaper a session-fresh timestamp, which
-addresses the first issue.
+**Still true:** a resumed sandbox running with *no* markers at all gets stopped at
+the first tick. A brand-new sandbox isn't affected, because its `createdAt` is its
+session start. The case that remains is a run started by hand, outside both the
+launcher and bootstrap, in a checkout with no markers.
+The SDK exposes no session start time that has been verified in production
+(`statusUpdatedAt` and `expiresAt` are candidates), so the budget stays on
+`createdAt` until one is.
 
 The 270s bootstrap timeout covers the measured 1–2 min cold bootstrap. A cold
 path that includes `playwright install-deps` hasn't been measured.
-
